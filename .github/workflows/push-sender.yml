@@ -1,0 +1,24 @@
+name: Push sender gratuito
+
+on:
+  schedule:
+    # Cada 5 minutos. GitHub Actions puede demorar 1-2 min en ejecutar.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Instalar dependencias
+        working-directory: push-sender
+        run: npm ci
+      - name: Enviar notificaciones pendientes
+        working-directory: push-sender
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: npm start

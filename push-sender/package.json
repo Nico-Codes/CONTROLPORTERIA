@@ -1,0 +1,13 @@
+{
+  "name": "control-rondas-push-sender",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Emisor gratuito de notificaciones push para Control de Rondas (GitHub Actions / cualquier host gratuito).",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}

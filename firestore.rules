@@ -22,8 +22,8 @@ service cloud.firestore {
       allow update: if false;
     }
 
-    // Tokens de dispositivos para notificaciones push.
-    match /dispositivos_notificaciones/{doc} {
+    // Cursor del emisor de push (último timestamp procesado).
+    match /config/{doc} {
       allow read, write: if true;
     }
   }

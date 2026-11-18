@@ -2535,3 +2535,169 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+
+// === Gate de permisos obligatorios (instalacion, notificaciones, ubicacion) ===
+(function inicializarGate() {
+    const gate = document.getElementById('gate-permisos');
+    if (!gate) return;
+
+    const esMovil = /android|iphone|ipad|ipod/i.test(navigator.userAgent) || (window.matchMedia('(max-width: 768px)').matches && 'ontouchstart' in window);
+    const esStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+    const itemInstall = document.getElementById('gate-item-install');
+    const btnInstall = document.getElementById('gate-btn-install');
+    const btnNotif = document.getElementById('gate-btn-notif');
+    const btnGps = document.getElementById('gate-btn-gps');
+    const btnContinuar = document.getElementById('gate-btn-continuar');
+    const mensaje = document.getElementById('gate-mensaje');
+
+    let notifOk = (typeof Notification === 'undefined') || Notification.permission === 'granted';
+    let gpsOk = !navigator.geolocation;
+    let installOk = !esMovil || esStandalone;
+
+    if (typeof Notification === 'undefined' && btnNotif) {
+        btnNotif.textContent = 'No soportado';
+        btnNotif.disabled = true;
+        btnNotif.classList.add('opacity-60');
+    }
+    if (!navigator.geolocation && btnGps) {
+        btnGps.textContent = 'No soportado';
+        btnGps.disabled = true;
+        btnGps.classList.add('opacity-60');
+    }
+
+    function mostrarMensaje(texto) {
+        if (!mensaje) return;
+        mensaje.textContent = texto;
+        mensaje.classList.remove('hidden');
+    }
+
+    function actualizarEstado() {
+        if (notifOk && btnNotif) {
+            btnNotif.textContent = 'OK';
+            btnNotif.disabled = true;
+            btnNotif.classList.add('opacity-60');
+        }
+        if (gpsOk && btnGps) {
+            btnGps.textContent = 'OK';
+            btnGps.disabled = true;
+            btnGps.classList.add('opacity-60');
+        }
+        if (installOk && btnInstall) {
+            btnInstall.textContent = 'OK';
+            btnInstall.disabled = true;
+            btnInstall.classList.add('opacity-60');
+        }
+        if (btnContinuar) {
+            btnContinuar.disabled = !(notifOk && gpsOk && installOk);
+        }
+    }
+
+    // Mostrar item de instalacion solo en movil no instalado
+    if (esMovil && !esStandalone && itemInstall) {
+        itemInstall.classList.remove('hidden');
+    } else {
+        installOk = true;
+    }
+
+    // Notificaciones
+    if (btnNotif) {
+        btnNotif.addEventListener('click', async () => {
+            if (typeof Notification === 'undefined') {
+                mostrarMensaje('Este navegador no soporta notificaciones.');
+                return;
+            }
+            try {
+                const perm = await Notification.requestPermission();
+                notifOk = (perm === 'granted');
+                if (!notifOk) {
+                    mostrarMensaje('Debes permitir las notificaciones para continuar. Activalas en la configuracion del navegador.');
+                }
+                actualizarEstado();
+            } catch (e) {
+                mostrarMensaje('No se pudo solicitar el permiso de notificaciones.');
+            }
+        });
+    }
+
+    // Ubicacion
+    if (btnGps) {
+        btnGps.addEventListener('click', () => {
+            if (!navigator.geolocation) {
+                mostrarMensaje('Este dispositivo no soporta geolocalizacion.');
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                () => { gpsOk = true; mensaje.classList.add('hidden'); actualizarEstado(); },
+                () => { mostrarMensaje('Debes permitir la ubicacion precisa para continuar. Activala en la configuracion del navegador.'); },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        });
+    }
+
+    // Instalacion
+    if (btnInstall) {
+        btnInstall.addEventListener('click', async () => {
+            if (deferredInstallPrompt) {
+                deferredInstallPrompt.prompt();
+                const { outcome } = await deferredInstallPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    installOk = true;
+                    mensaje.classList.add('hidden');
+                } else {
+                    mostrarMensaje('Debes instalar la app para continuar.');
+                }
+                deferredInstallPrompt = null;
+                actualizarEstado();
+            } else {
+                // Instrucciones manuales (iOS o navegador sin beforeinstallprompt)
+                mostrarMensaje('Instalala manualmente: en el menu del navegador elegi "Agregar a pantalla de inicio" o "Instalar app".');
+            }
+        });
+    }
+
+    // Si el prompt de instalacion llega despues
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredInstallPrompt = e;
+        if (esMovil && !esStandalone && itemInstall) {
+            itemInstall.classList.remove('hidden');
+        }
+    });
+    window.addEventListener('appinstalled', () => {
+        installOk = true;
+        if (itemInstall) itemInstall.classList.add('hidden');
+        actualizarEstado();
+    });
+
+    // Verificar permisos ya concedidos
+    if (notifOk) actualizarEstado();
+    if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'geolocation' }).then(res => {
+            if (res.state === 'granted') { gpsOk = true; actualizarEstado(); }
+            res.addEventListener('change', () => {
+                gpsOk = (res.state === 'granted');
+                actualizarEstado();
+            });
+        }).catch(() => {});
+    }
+
+    // Continuar
+    if (btnContinuar) {
+        btnContinuar.addEventListener('click', () => {
+            if (notifOk && gpsOk && installOk) {
+                gate.classList.add('hidden');
+            }
+        });
+    }
+
+    // Si todo ya esta OK, ocultar el gate de inmediato
+    // (se verifica despues de un tick para que los permisos se evaluen)
+    setTimeout(() => {
+        if (notifOk && gpsOk && installOk && !(esMovil && !esStandalone)) {
+            gate.classList.add('hidden');
+        }
+        actualizarEstado();
+    }, 300);
+})();

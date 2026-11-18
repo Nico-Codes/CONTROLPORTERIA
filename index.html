@@ -36,6 +36,56 @@
     <script type="module" src="/src/main.js"></script>
 </head>
 <body class="bg-[#F7F7F5] text-[#0F172A] min-h-screen flex flex-col antialiased selection:bg-[#0F172A] selection:text-white">
+
+    <!-- Gate de permisos obligatorios -->
+    <div id="gate-permisos" class="fixed inset-0 z-[100] bg-[#F7F7F5] flex items-center justify-center p-4">
+        <div class="w-full max-w-[420px] bg-white rounded-2xl shadow-xl border border-[#E2E8F0] p-6 space-y-5">
+            <div class="text-center space-y-1">
+                <div class="w-12 h-12 mx-auto rounded-xl bg-[#0F172A] text-white flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <h1 class="text-lg font-semibold text-[#0F172A]">Acceso a Control de Rondas</h1>
+                <p class="text-xs text-[#64748B]">Para usar la app necesitás conceder estos permisos:</p>
+            </div>
+
+            <div class="space-y-3">
+                <div id="gate-item-install" class="hidden flex items-center gap-3 p-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC]">
+                    <i class="fa-solid fa-download text-[#0F172A] w-5 text-center"></i>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-[#0F172A]">Instalar la app (Android)</p>
+                        <p class="text-[11px] text-[#64748B]">Agregala a la pantalla de inicio para recibir notificaciones.</p>
+                    </div>
+                    <button id="gate-btn-install" class="h-8 px-3 bg-[#0F172A] text-white rounded-lg text-xs font-semibold shrink-0">Instalar</button>
+                </div>
+
+                <div class="flex items-center gap-3 p-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC]">
+                    <i class="fa-solid fa-bell text-[#0F172A] w-5 text-center"></i>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-[#0F172A]">Notificaciones</p>
+                        <p class="text-[11px] text-[#64748B]">Alertas de rondas y vencimientos.</p>
+                    </div>
+                    <button id="gate-btn-notif" class="h-8 px-3 bg-[#0F172A] text-white rounded-lg text-xs font-semibold shrink-0">Activar</button>
+                </div>
+
+                <div class="flex items-center gap-3 p-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC]">
+                    <i class="fa-solid fa-location-crosshairs text-[#0F172A] w-5 text-center"></i>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-[#0F172A]">Ubicación precisa</p>
+                        <p class="text-[11px] text-[#64748B]">Validación GPS en cada escaneo.</p>
+                    </div>
+                    <button id="gate-btn-gps" class="h-8 px-3 bg-[#0F172A] text-white rounded-lg text-xs font-semibold shrink-0">Activar</button>
+                </div>
+            </div>
+
+            <div id="gate-mensaje" class="text-[11px] text-[#B91C1C] text-center hidden"></div>
+
+            <button id="gate-btn-continuar" disabled class="w-full h-11 rounded-xl bg-[#0F172A] text-white font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed transition">
+                Continuar
+            </button>
+            <p class="text-[10px] text-[#94A3B8] text-center">Si bloqueaste un permiso, activalo desde la configuración del navegador.</p>
+        </div>
+    </div>
+
 <!-- ========================================== -->
     <!--           VISTA DEL OPERADOR (MÓVIL)       -->
     <!-- ========================================== -->

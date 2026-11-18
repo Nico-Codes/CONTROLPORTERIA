@@ -35,8 +35,13 @@ self.addEventListener('activate', (event) => {
 if (messaging) {
     messaging.onBackgroundMessage((payload) => {
         console.log('[SW] Push recibido en segundo plano:', payload);
-        const title = payload.notification?.title || payload.data?.title || "Control de Rondas · Meatex";
-        const body = payload.notification?.body || payload.data?.body || "Aviso del sistema de rondas.";
+
+        // Si el mensaje trae un bloque `notification`, FCM ya muestra una notificación
+        // automáticamente. Mostrar otra aquí duplicaría el aviso.
+        if (payload.notification) return;
+
+        const title = payload.data?.title || "Control de Rondas · Meatex";
+        const body = payload.data?.body || "Aviso del sistema de rondas.";
         const severidad = payload.data?.severidad || "info";
 
         const options = {

@@ -2611,7 +2611,9 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const perm = await Notification.requestPermission();
                 notifOk = (perm === 'granted');
-                if (!notifOk) {
+                if (notifOk) {
+                    try { await registrarTokenFCM(); } catch (e) { console.warn('[Gate] Error registrando token FCM:', e); }
+                } else {
                     mostrarMensaje('Debes permitir las notificaciones para continuar. Activalas en la configuracion del navegador.');
                 }
                 actualizarEstado();

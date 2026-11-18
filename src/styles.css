@@ -1,0 +1,45 @@
+body {
+            font-family: 'IBM Plex Sans', sans-serif;
+            background-color: #F7F7F5;
+            color: #0F172A;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .font-mono-val {
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        @keyframes scanline {
+            0% { top: 0%; opacity: 0.8; }
+            50% { opacity: 1; }
+            100% { top: 100%; opacity: 0.8; }
+        }
+        .animar-linea-qr {
+            animation: scanline 2.2s infinite ease-in-out;
+        }
+        @keyframes sacudida {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); }
+            40%, 80% { transform: translateX(6px); }
+        }
+        .animar-sacudida {
+            animation: sacudida 0.3s ease-in-out;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .spinning {
+            animation: spin 0.8s linear infinite;
+        }
+        .pt-safe {
+            padding-top: env(safe-area-inset-top, 0px);
+        }
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }

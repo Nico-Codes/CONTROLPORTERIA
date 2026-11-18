@@ -4,6 +4,9 @@
   "private": true,
   "description": "PWA de control de rondas con QR, GPS y ventanas horarias",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "test": "node tests/validar-index.mjs && node tests/validar-reglas.mjs",
     "test:html": "node tests/validar-index.mjs",
     "test:reglas": "node tests/validar-reglas.mjs",
@@ -11,5 +14,8 @@
   },
   "dependencies": {
     "firebase-admin": "^12.7.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8"
   }
 }

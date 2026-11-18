@@ -4,36 +4,34 @@ PWA estática para registrar y auditar rondas de vigilancia mediante códigos QR
 
 ## Estado actual
 
-- `public/index.html`: aplicación completa (HTML, CSS y JavaScript).
-- `public/firebase-messaging-sw.js`: service worker de FCM y notificaciones.
-- `public/manifest.json`: metadatos PWA.
+- `index.html`: punto de entrada de Vite (HTML + referencias a `src/`).
+- `src/main.js`: toda la lógica de la aplicación (módulo ES).
+- `src/styles.css`: estilos propios (el resto usa Tailwind CDN).
+- `public/`: archivos estáticos servidos en la raíz (`manifest.json`, iconos, `firebase-messaging-sw.js`, `404.html`).
+- `api/push.js`: función serverless de Vercel (emisor de push).
+- `push-sender/`: script equivalente para ejecución local o cron externo.
 - `firestore.rules`: reglas de Firestore versionadas.
-- `documentacion_control_rondas_meatex.md`: documentación funcional y técnica.
-- `tests/validar-index.mjs`: validación estática del HTML/JS (IDs y handlers).
+- `tests/`: validación estática y pruebas de contrato.
+- `vite.config.mjs`: configuración de Vite.
 - `tests/validar-reglas.mjs`: pruebas de contrato de las reglas de negocio y de Firestore.
 - `package.json`: scripts de prueba y servidor local (sin dependencias).
 
 No hay build ni tests de navegador. El repositorio Git está inicializado en la rama `main`.
 
-## Puesta en marcha
+## Desarrollo local
 
-1. Instalar Firebase CLI si no está disponible:
-   ```bash
-   npm install -g firebase-tools
-   ```
-2. Iniciar sesión y seleccionar el proyecto:
-   ```bash
-   firebase login
-   firebase use control-rondas-porteria-7ecc7
-   ```
-3. Desplegar reglas de Firestore:
-   ```bash
-   firebase deploy --only firestore:rules
-   ```
-4. Desplegar la aplicación:
-   ```bash
-   firebase deploy --only hosting
-   ```
+```bash
+npm install
+npm run dev        # servidor de desarrollo Vite (http://localhost:5173)
+npm run build      # genera dist/ para producción
+npm run preview    # previsualiza el build
+npm test           # validación estática + pruebas de contrato
+```
+
+## Despliegue
+
+- **Vercel:** importá el repo en Vercel. Detecta Vite automáticamente, ejecuta `npm run build` y sirve `dist/`. La función `api/push.js` se despliega como serverless.
+- **Firebase:** las reglas de Firestore se despliegan con `firebase deploy --only firestore:rules`. El hosting de Firebase redirige a Vercel.
 
 ## Firestore
 

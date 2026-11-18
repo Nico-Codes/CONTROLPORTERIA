@@ -11,7 +11,9 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const html = readFileSync(resolve(raiz, 'public/index.html'), 'utf8');
+const html = readFileSync(resolve(raiz, 'index.html'), 'utf8');
+const js = readFileSync(resolve(raiz, 'src/main.js'), 'utf8');
+const codigo = html + '\n' + js;
 const reglas = readFileSync(resolve(raiz, 'firestore.rules'), 'utf8');
 
 const fallas = [];
@@ -23,13 +25,13 @@ function comprobar(nombre, condicion, detalle = '') {
 }
 
 function contiene(fragmento) {
-  return html.includes(fragmento);
+  return codigo.includes(fragmento);
 }
 
 // Límites operativos
-comprobar('Máximo 30 operadores', /const MAX_OPERADORES = 30;/.test(html));
-comprobar('Máximo 20 puntos de control', /const MAX_PUNTOS = 20;/.test(html));
-comprobar('Retención de 60 días', /const DIAS_RETENCION = 60;/.test(html));
+comprobar('Máximo 30 operadores', /const MAX_OPERADORES = 30;/.test(codigo));
+comprobar('Máximo 20 puntos de control', /const MAX_PUNTOS = 20;/.test(codigo));
+comprobar('Retención de 60 días', /const DIAS_RETENCION = 60;/.test(codigo));
 
 // Retención y modelo de datos
 comprobar('Los registros guardan expiraEn', contiene('expiraEn: new Date(ahora.getTime() + RETENCION_MS)'));
@@ -39,7 +41,7 @@ comprobar('Los registros guardan tolerancia', contiene('tolerancia: tolerancia')
 comprobar('La cola offline reconstruye las fechas', contiene('itemFs.expiraEn = new Date(Number(itemFs.timestampMs) + RETENCION_MS)'));
 
 // Regla de escaneo por horario
-comprobar('Solo un registro OK completa una ruta', /function registroCorrespondeARuta\(reg, ruta\) \{\s*if \(!reg \|\| !ruta \|\| reg\.severidad !== "OK"\) return false;/.test(html));
+comprobar('Solo un registro OK completa una ruta', /function registroCorrespondeARuta\(reg, ruta\) \{\s*if \(!reg \|\| !ruta \|\| reg\.severidad !== "OK"\) return false;/.test(codigo));
 comprobar('La agenda usa registroCorrespondeARuta', contiene('const regOk = regsHoy.find(reg => registroCorrespondeARuta(reg, r));'));
 comprobar('El escaneo prioriza la ruta pendiente más temprana', contiene('const pendientes = rutasPunto.filter(r => !rutaCompletada(regsHoy, r));'));
 

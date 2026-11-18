@@ -1,20 +1,18 @@
 #!/usr/bin/env node
 /**
- * Validación estática del monolito public/index.html.
+ * Validación estática del HTML y JS del proyecto.
  * No necesita dependencias: se ejecuta con `node tests/validar-index.mjs`.
- *
- * Detecta:
- *  - IDs referenciados con getElementById() que no existen en el HTML.
- *  - IDs duplicados.
- *  - Handlers inline (onclick, onchange, etc.) que llaman a funciones no definidas.
  */
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const archivo = resolve(raiz, 'public/index.html');
-const html = readFileSync(archivo, 'utf8');
+const archivoHtml = resolve(raiz, 'index.html');
+const archivoJs = resolve(raiz, 'src/main.js');
+const html = readFileSync(archivoHtml, 'utf8');
+const js = readFileSync(archivoJs, 'utf8');
+const codigo = html + '\n' + js;
 
 const errores = [];
 const advertencias = [];
@@ -27,7 +25,7 @@ if (duplicados.length > 0) {
   errores.push(`IDs duplicados: ${[...new Set(duplicados)].join(', ')}`);
 }
 
-const referencias = [...html.matchAll(/getElementById\(\s*['"]([^'"]+)['"]\s*\)/g)]
+const referencias = [...codigo.matchAll(/getElementById\(\s*['"]([^'"]+)['"]\s*\)/g)]
   .map(m => m[1]);
 const faltantes = [...new Set(referencias.filter(id => !idsUnicos.has(id)))];
 
@@ -38,8 +36,8 @@ if (faltantes.length > 0) {
 const handlers = [...html.matchAll(/\bon[a-z]+\s*=\s*["']([A-Za-z_$][\w$]*)\(/g)]
   .map(m => m[1]);
 const funcionesDefinidas = new Set([
-  ...[...html.matchAll(/\bfunction\s+([A-Za-z_$][\w$]*)\s*\(/g)].map(m => m[1]),
-  ...[...html.matchAll(/\bwindow\.([A-Za-z_$][\w$]*)\s*=/g)].map(m => m[1])
+  ...[...js.matchAll(/\bfunction\s+([A-Za-z_$][\w$]*)\s*\(/g)].map(m => m[1]),
+  ...[...js.matchAll(/\bwindow\.([A-Za-z_$][\w$]*)\s*=/g)].map(m => m[1])
 ]);
 const handlersFaltantes = [...new Set(handlers.filter(fn => !funcionesDefinidas.has(fn)))];
 
@@ -47,13 +45,12 @@ if (handlersFaltantes.length > 0) {
   errores.push(`Handlers inline sin función definida: ${handlersFaltantes.join(', ')}`);
 }
 
-// Aviso: getElementById con template strings no se puede validar estáticamente.
-const dinamicos = [...html.matchAll(/getElementById\(\s*`([^`]+)`\s*\)/g)].map(m => m[1]);
+const dinamicos = [...codigo.matchAll(/getElementById\(\s*`([^`]+)`\s*\)/g)].map(m => m[1]);
 if (dinamicos.length > 0) {
   advertencias.push(`IDs construidos dinámicamente (revisar a mano): ${dinamicos.join(', ')}`);
 }
 
-console.log(`Archivo: ${archivo}`);
+console.log(`Archivos: ${archivoHtml} + ${archivoJs}`);
 console.log(`IDs definidos: ${idsUnicos.size}`);
 console.log(`Referencias getElementById(): ${new Set(referencias).size}`);
 console.log(`Handlers inline: ${new Set(handlers).size}`);

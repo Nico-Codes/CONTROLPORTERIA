@@ -68,15 +68,22 @@ self.addEventListener('message', (event) => {
 // Acción al hacer clic en la notificación desde la barra de Android
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
+    const urlDestino = 'https://controlporteria.vercel.app/';
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+            // Priorizar una pestaña ya abierta en Vercel.
+            for (const client of windowClients) {
+                if (client.url && client.url.includes('vercel.app') && 'focus' in client) {
+                    return client.focus();
+                }
+            }
             for (const client of windowClients) {
                 if (client.url && 'focus' in client) {
                     return client.focus();
                 }
             }
             if (clients.openWindow) {
-                return clients.openWindow('/');
+                return clients.openWindow(urlDestino);
             }
         })
     );

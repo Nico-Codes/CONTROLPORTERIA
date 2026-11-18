@@ -41,6 +41,7 @@ comprobar('La cola offline reconstruye las fechas', contiene('itemFs.expiraEn = 
 // Regla de escaneo por horario
 comprobar('Solo un registro OK completa una ruta', /function registroCorrespondeARuta\(reg, ruta\) \{\s*if \(!reg \|\| !ruta \|\| reg\.severidad !== "OK"\) return false;/.test(html));
 comprobar('La agenda usa rutaCompletada', contiene('const yaEscaneado = rutaCompletada(regsHoy, ruta);'));
+comprobar('El escaneo prioriza la ruta pendiente más temprana', contiene('const pendientes = rutasPunto.filter(r => !rutaCompletada(regsHoy, r));'));
 
 // Panel
 comprobar('Los KPIs usan el cache del día seleccionado', contiene('const regsDia = registrosAdminCache.filter(r => r.fechaISO === fechaFiltro);'));
@@ -49,7 +50,7 @@ comprobar('No quedan IDs inexistentes del bug original', !contiene('badge-critic
 
 // Operadores
 comprobar('Existe activar/desactivar operador', contiene('window.toggleOperadorActivo = async (id, activo)'));
-comprobar('La tabla de personal usa métricas reales', contiene('const escaneosOp = regsHoy.filter(r => r.operador === op.nombre);'));
+comprobar('La tabla de personal usa métricas reales', contiene('const escaneosOp = regsDia.filter(r => r.operador === op.nombre);'));
 comprobar('Eliminar operador pide confirmación', contiene('if (!confirm(`¿Eliminar a "${nombre}"? El historial de escaneos se conserva.`)) return;'));
 
 // Puntos y rutas

@@ -1752,33 +1752,63 @@
                 const rutasPunto = rutasCache.filter(r => (r.dia === hoyNombre || r.dia === "Todos") && r.codigoQR === codigoLeido);
 
                 let estado = "Válido", severidad = "OK", motivoCritico = "";
-                let mejor = rutasPunto.length > 0 ? rutasPunto[0] : null;
+                let mejor = null;
                 let desvioMin = null;
-                let margen = mejor ? (mejor.margen || 15) : 15;
+                let margen = 15;
+                let menorDiff = Infinity;
 
                 if (rutasPunto.length === 0) {
                     estado = "QR no programado hoy";
                     severidad = "CRITICO";
                     motivoCritico = "no_programado";
                 } else {
-                    let menorDiff = Infinity;
-                    rutasPunto.forEach(r => {
-                        const [hh, mm] = r.hora.split(':').map(Number);
-                        const obj = new Date(ahora); obj.setHours(hh, mm, 0, 0);
-                        const diff = Math.abs(ahora.getTime() - obj.getTime());
-                        if (diff < menorDiff) {
-                            menorDiff = diff;
-                            mejor = r;
-                            desvioMin = Math.round((ahora.getTime() - obj.getTime()) / 60000);
+                    const hoyISO = obtenerFechaHoyISO();
+                    const regsHoy = registrosCache.filter(r => r.fechaISO === hoyISO);
+                    const pendientes = rutasPunto.filter(r => !rutaCompletada(regsHoy, r));
+                    const candidatas = pendientes.length > 0 ? pendientes : rutasPunto;
+
+                    // Prioriza la ruta pendiente más temprana que esté dentro de su margen.
+                    // Así, si un punto tiene varios horarios el mismo día, cada escaneo
+                    // completa una ruta distinta y no se repite siempre la más cercana.
+                    let dentroDeMargen = null;
+                    candidatas.forEach(r => {
+                        const [hh, mm] = (r.hora || "00:00").split(':').map(Number);
+                        const obj = new Date(ahora);
+                        obj.setHours(isNaN(hh) ? 0 : hh, isNaN(mm) ? 0 : mm, 0, 0);
+                        const diffMin = Math.round((ahora.getTime() - obj.getTime()) / 60000);
+                        const margenRuta = Number(r.margen) || 15;
+                        if (Math.abs(diffMin) <= margenRuta) {
+                            if (!dentroDeMargen || obj.getTime() < dentroDeMargen.obj.getTime()) {
+                                dentroDeMargen = { ruta: r, obj, diffMin, margen: margenRuta };
+                            }
                         }
                     });
-                    margen = mejor.margen || 15;
+
+                    if (dentroDeMargen) {
+                        mejor = dentroDeMargen.ruta;
+                        desvioMin = dentroDeMargen.diffMin;
+                        margen = dentroDeMargen.margen;
+                        menorDiff = Math.abs(desvioMin) * 60000;
+                    } else {
+                        candidatas.forEach(r => {
+                            const [hh, mm] = (r.hora || "00:00").split(':').map(Number);
+                            const obj = new Date(ahora);
+                            obj.setHours(isNaN(hh) ? 0 : hh, isNaN(mm) ? 0 : mm, 0, 0);
+                            const diff = Math.abs(ahora.getTime() - obj.getTime());
+                            if (diff < menorDiff) {
+                                menorDiff = diff;
+                                mejor = r;
+                                desvioMin = Math.round((ahora.getTime() - obj.getTime()) / 60000);
+                            }
+                        });
+                        margen = mejor ? (Number(mejor.margen) || 15) : 15;
+                    }
 
                     if (!gpsValido) {
                         estado = "Fuera de rango GPS";
                         severidad = "CRITICO";
                         motivoCritico = "fuera_rango";
-                    } else if (menorDiff > (margen * 60000)) {
+                    } else if (!dentroDeMargen) {
                         estado = "Fuera de horario";
                         severidad = "ADVERTENCIA";
                     }
@@ -3247,10 +3277,11 @@
                 return;
             }
 
-            const regsHoy = registrosCache.filter(r => r.fechaISO === obtenerFechaHoyISO());
+            const fechaSel = obtenerFechaFiltroISO();
+            const regsDia = registrosAdminCache.filter(r => r.fechaISO === fechaSel);
 
             operadoresCache.forEach(op => {
-                const escaneosOp = regsHoy.filter(r => r.operador === op.nombre);
+                const escaneosOp = regsDia.filter(r => r.operador === op.nombre);
                 const validosOp = escaneosOp.filter(r => r.severidad === "OK").length;
                 const totalOp = escaneosOp.length;
                 const pctOp = totalOp > 0 ? Math.round((validosOp / totalOp) * 100) : 0;
@@ -3285,7 +3316,7 @@
                             </div>
                         </td>
                         <td class="py-3.5 px-5 font-mono-val text-xs ${pctOp >= 80 ? 'text-[#059669]' : pctOp >= 50 ? 'text-[#B45309]' : 'text-[#B91C1C]'} font-semibold">${pctOp}%</td>
-                        <td class="py-3.5 px-5 font-mono-val text-xs text-[#64748B]">${obtenerUltimoEscaneoOperador(op.nombre)}</td>
+                        <td class="py-3.5 px-5 font-mono-val text-xs text-[#64748B]">${obtenerUltimoEscaneoOperador(op.nombre, regsDia)}</td>
                         <td class="py-3.5 px-5">${estadoHtml}</td>
                         <td class="py-3.5 px-2 text-right whitespace-nowrap">
                             ${toggleHtml}

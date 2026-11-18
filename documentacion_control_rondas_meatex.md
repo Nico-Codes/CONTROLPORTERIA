@@ -464,7 +464,7 @@ onSnapshot(query(collection(db, "registros_ronda"), orderBy("timestampMs", "desc
 
 ### 10.3 Función `lanzarNotificacionSistema`
 
-Maneja **3 canales** en orden de preferencia:
+Maneja **2 canales** en orden de preferencia:
 
 ```
 1. swRegistration.showNotification()  → Android Chrome (canal principal)
@@ -473,9 +473,7 @@ Maneja **3 canales** en orden de preferencia:
 
 2. new Notification()  → Fallback para navegadores desktop
 
-3. Banner in-app  → Siempre visible en la propia pantalla de la app
-   - Aparece en la parte superior
-   - Se auto-oculta tras 5 segundos
+El banner in-app se eliminó: solo se emiten notificaciones del sistema.
 ```
 
 > [!IMPORTANT]
@@ -609,7 +607,7 @@ sequenceDiagram
 
 | Contexto | Manejador | Canal |
 |---|---|---|
-| App abierta y visible | `onMessage(messaging, handler)` en `index.html` | Banner in-app + vibración |
+| App abierta y visible | `onMessage(messaging, handler)` en `index.html` | Notificación nativa (SW) + vibración |
 | App en segundo plano / cerrada | `messaging.onBackgroundMessage()` en SW | Notificación nativa Android |
 | Mensaje desde la app al SW | `swRegistration.postMessage({ type: 'SHOW_NATIVE_NOTIFICATION' })` | Notificación nativa Android |
 
@@ -749,7 +747,7 @@ const PASSWORD_ENCARGADO = "admin123";
 
 | Función | Qué hace |
 |---|---|
-| `lanzarNotificacionSistema(titulo, texto, severidad, tag)` | async — Banner + SW notification + vibración |
+| `lanzarNotificacionSistema(titulo, texto, severidad, tag)` | async - Notificación nativa (SW) + vibración |
 | `debeEmitirAlerta(clave, intervaloMs)` | Anti-repetición de alertas |
 | `iniciarMotorAlertasOperador()` | Loop de 30s con 3 tipos de alertas consolidadas |
 | `registrarTokenFCM(rol)` | Guarda el token FCM en `dispositivos_notificaciones` |

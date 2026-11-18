@@ -10,8 +10,10 @@ PWA estática para registrar y auditar rondas de vigilancia mediante códigos QR
 - `firestore.rules`: reglas de Firestore versionadas.
 - `documentacion_control_rondas_meatex.md`: documentación funcional y técnica.
 - `tests/validar-index.mjs`: validación estática del HTML/JS (IDs y handlers).
+- `tests/validar-reglas.mjs`: pruebas de contrato de las reglas de negocio y de Firestore.
+- `package.json`: scripts de prueba y servidor local (sin dependencias).
 
-No hay build, `package.json`, tests de navegador ni repositorio Git inicializado.
+No hay build ni tests de navegador. El repositorio Git está inicializado en la rama `main`.
 
 ## Puesta en marcha
 
@@ -40,20 +42,18 @@ No hay build, `package.json`, tests de navegador ni repositorio Git inicializado
 El archivo `firestore.rules` reproduce las reglas actuales del proyecto y agrega la colección que faltaba:
 
 - `operadores`, `puntos_control` y `rutas_horarias`: lectura y escritura.
-- `registros_ronda`: solo lectura y creación; no se modifican ni se borran desde la app.
+- `registros_ronda`: lectura, creación y borrado (la app borra en lotes los registros de más de 60 días); no se permite modificar.
 - `dispositivos_notificaciones`: lectura y escritura (necesario para guardar los tokens FCM).
 
 > Las reglas siguen siendo abiertas porque la aplicación no usa Firebase Auth. Cualquier persona con la URL puede escribir en las colecciones. Endurecerlas requiere implementar autenticación.
 
 ### Retención de 60 días
 
-Los registros nuevos guardan `expiraEn` (timestamp). Para que Firestore elimine automáticamente los registros con más de 60 días:
+Los registros nuevos guardan `expiraEn` (timestamp) y la aplicación elimina en lotes los registros con más de 60 días al cargar. La limpieza corre en segundo plano, sin bloquear el panel, y borra hasta 2.000 registros por carga.
 
-1. Ir a Google Cloud Console → Firestore → **Time-to-live**.
-2. Crear una política TTL sobre la colección `registros_ronda` y el campo `expiraEn`.
-3. Verificar que la política quede en estado **Activa**.
+> La política TTL de Firestore sería la opción ideal, pero el proyecto tiene la facturación deshabilitada y la API administrativa devuelve `403 billing disabled`. Si en el futuro se habilita el plan Blaze, se puede activar TTL sobre `expiraEn` y quitar el borrado desde la app.
 
-La eliminación por TTL la ejecuta Firestore, no la aplicación, por lo que no requiere permiso de `delete` en las reglas. Los registros históricos anteriores a este cambio no tienen `expiraEn`; si se quiere aplicarles retención, hay que borrarlos o migrarlos una vez desde la consola o con un script administrativo.
+Los registros históricos anteriores a este cambio no tienen `expiraEn`, pero sí `timestampMs`, por lo que la limpieza por fecha también los alcanza.
 
 ### Límites operativos
 
@@ -98,13 +98,18 @@ Sin VAPID, `getToken()` falla y no se registran tokens nuevos. El código actual
 
 ```bash
 node tests/validar-index.mjs
+node tests/validar-reglas.mjs
+# o simplemente
+npm test
 ```
 
-El script detecta:
+`validar-index.mjs` detecta:
 
 - `getElementById()` que apunta a IDs inexistentes.
 - IDs duplicados.
 - Handlers inline (`onclick`, `onchange`, etc.) sin función definida.
+
+`validar-reglas.mjs` congela las reglas de negocio críticas: límites, retención, escaneo por horario, métricas reales del panel, exportación y reglas de Firestore.
 
 También se puede validar la sintaxis del JavaScript extrayendo el `<script type="module">` y ejecutando `node --check`.
 
@@ -113,5 +118,5 @@ También se puede validar la sintaxis del JavaScript extrayendo el `<script type
 - La contraseña del encargado (`admin123`) está en el código y no hay Firebase Auth.
 - Las reglas de Firestore son abiertas.
 - No hay cache de app shell: sin internet la app no carga de forma fiable, aunque los escaneos ya abiertos se encolan en `localStorage`.
-- No hay repositorio Git ni pipeline de despliegue.
+- No hay pipeline de despliegue; se despliega con Firebase CLI.
 - No hay tests automatizados de reglas de negocio; solo validación estática.

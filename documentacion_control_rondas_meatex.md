@@ -225,13 +225,17 @@ Padrón del personal de vigilancia habilitado.
 | `activo` | `boolean` | Controla si aparece disponible en la vista móvil |
 
 ### 6.4 `registros_ronda`
-Historial **inmutable** de cada escaneo realizado (trazabilidad de auditoría).
+Historial **de solo adición**: cada escaneo se crea una vez y no se modifica. La app elimina en lotes los registros con más de 60 días para cumplir la retención.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
 | `operador` | `string` | Nombre del guardia que ejecutó el escaneo |
 | `puntoNombre` | `string` | Nombre del punto (o `"QR no reconocido"`) |
 | `codigoQR` | `string` | Cadena leída por la cámara |
+| `rutaId` | `string \| null` | ID de la ruta de `rutas_horarias` asociada al escaneo |
+| `diaRuta` | `string \| null` | Día de la ruta aplicada |
+| `margen` | `number \| null` | Margen vigente al momento del escaneo |
+| `tolerancia` | `number` | Tolerancia GPS vigente al momento del escaneo |
 | `fechaTexto` | `string` | Fecha y hora legible `DD/MM/YYYY HH:MM` |
 | `fechaISO` | `string` | Fecha normalizada `YYYY-MM-DD` (para filtrado diario) |
 | `timestampMs` | `number` | Marca de tiempo Unix en ms (para ordenamiento y cálculos) |
@@ -241,9 +245,11 @@ Historial **inmutable** de cada escaneo realizado (trazabilidad de auditoría).
 | `distancia` / `gpsDist` | `number` | Distancia calculada en metros entre punto y guardia |
 | `estado` | `string` | Descripción textual: `"Válido"`, `"Fuera de horario"`, `"Fuera de rango GPS"`, `"QR no programado hoy"` |
 | `severidad` | `string` | Clasificación de negocio: `"OK"`, `"ADVERTENCIA"` o `"CRITICO"` |
+| `creadoEn` | `timestamp` | Fecha de creación (para consultas por rango) |
+| `expiraEn` | `timestamp` | Fecha de referencia de retención (60 días) |
 
 ### 6.5 `dispositivos_notificaciones`
-Registro de tokens FCM por dispositivo/operador (nueva colección).
+Registro de tokens FCM por dispositivo/operador.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
@@ -253,7 +259,7 @@ Registro de tokens FCM por dispositivo/operador (nueva colección).
 | `timestamp` | `number` | Marca de tiempo del último registro del token |
 
 > [!NOTE]
-> `registros_ronda` es de escritura pero nunca se borra desde la app. Es el registro de auditoría permanente. `puntos_control` y `rutas_horarias` sí se pueden eliminar desde el panel del encargado.
+> `registros_ronda` no se modifica nunca. La app elimina en lotes los registros de más de 60 días; el resto de las colecciones se administra desde el panel del encargado.
 
 ---
 
@@ -830,7 +836,7 @@ La autenticación del guardia es por selección de nombre (sin password) para ma
 | Nov 2026 | **FCM:** Función `registrarTokenFCM()`, listener supervisor en tiempo real, `lanzarNotificacionSistema` usa SW para Android Chrome |
 | 18/11/2026 | **Fix panel:** eliminadas referencias a IDs inexistentes en `renderizarKPIs`; el panel ya muestra puntos, rutas y personal sin necesidad de crear un usuario |
 | 18/11/2026 | **Rondas:** cada horario programado exige su propio escaneo; un escaneo ya no completa todos los horarios del mismo punto |
-| 18/11/2026 | **Retención:** campo `expiraEn` y retención de 60 días mediante TTL de Firestore |
+| 18/11/2026 | **Retención:** campo `expiraEn` y limpieza en lotes de registros con más de 60 días desde la app (TTL bloqueado por facturación) |
 | 18/11/2026 | **Límites:** máximo 20 puntos y 30 operadores, validado en la interfaz |
 | 18/11/2026 | **Personal:** activar/desactivar operadores, métricas reales del día y confirmación antes de eliminar |
 | 18/11/2026 | **Exportación:** XLSX con detalle, resumen y cumplimiento por operador (últimos 60 días o día seleccionado) |
@@ -854,7 +860,7 @@ Esta sección describe el comportamiento **real** del código en esta fecha y co
 | `margen` | number | Margen aplicado en el momento del escaneo |
 | `tolerancia` | number | Tolerancia GPS aplicada en el momento del escaneo |
 | `creadoEn` | timestamp | Fecha de creación del registro |
-| `expiraEn` | timestamp | Fecha de expiración para la política TTL (60 días) |
+| `expiraEn` | timestamp | Fecha de referencia para la retención (60 días) |
 
 Esto permite que la auditoría histórica no se reinterpreta con la tolerancia o el margen actuales del punto.
 
@@ -877,7 +883,7 @@ Si un punto tiene varios horarios el mismo día, **cada horario requiere un esca
 
 ### 21.5 Retención, límites y exportación
 
-- Retención: 60 días mediante `expiraEn` + política TTL de Firestore. Los registros antiguos sin `expiraEn` no se eliminan automáticamente.
+- Retención: la app elimina en lotes hasta 2.000 registros con más de 60 días en cada carga. Los registros históricos sin `expiraEn` también se eliminan porque la limpieza usa `timestampMs`. La política TTL de Firestore queda como alternativa, pero requiere habilitar facturación.
 - Límites: 20 puntos de control y 30 operadores.
 - Exportación: `.xlsx` con hojas `Rondas`, `Resumen` y `Por operador`. Si el panel está en el día actual, exporta los últimos 60 días; si se navegó a una fecha anterior, exporta ese día. Aplica los filtros activos.
 - El botón de imprimir QR genera una hoja de impresión con todos los QR; la descarga individual se convierte a PNG real.
@@ -895,9 +901,9 @@ Si un punto tiene varios horarios el mismo día, **cada horario requiere un esca
 | Contraseña `admin123` hardcodeada | Pendiente: migrar a Firebase Auth |
 | Reglas de Firestore abiertas | Pendiente: requieren autenticación para endurecerse |
 | Push con app cerrada | Requiere clave VAPID y un emisor de push; el repositorio no incluye el emisor |
+| TTL de Firestore | Bloqueado: el proyecto tiene facturación deshabilitada (`403 billing disabled`). La app hace la limpieza en su lugar |
 | Offline completo | Solo se encolan registros; no hay cache de app shell |
-| Registros históricos sin `expiraEn` | Requieren migración o borrado manual |
-| Tests de reglas de negocio | Solo existe validación estática (`tests/validar-index.mjs`) |
+| Tests | Validación estática y pruebas de contrato (`npm test`); faltan pruebas de integración en navegador |
 
 ---
 

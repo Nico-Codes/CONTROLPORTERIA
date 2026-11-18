@@ -65,8 +65,10 @@ comprobar('La exportación respeta 60 días desde hoy', contiene('const corte = 
 
 // Reglas de Firestore
 comprobar('firestore.rules versiona las reglas', reglas.includes("rules_version = '2';"));
-comprobar('Las reglas permiten crear registros', /match \/registros_ronda\/\{doc\} \{[\s\S]*allow read, create: if true;/.test(reglas));
-comprobar('Las reglas niegan update/delete de registros', /allow update, delete: if false;/.test(reglas));
+comprobar('Las reglas permiten crear registros', /match \/registros_ronda\/\{doc\} \{[\s\S]*allow read, create, delete: if true;/.test(reglas));
+comprobar('Las reglas niegan la modificación de registros', /allow update: if false;/.test(reglas));
+comprobar('La app limpia registros de más de 60 días', contiene('async function limpiarRegistrosAntiguos()'));
+comprobar('La limpieza usa lotes de 400 registros', contiene('limit(400)'));
 comprobar('Las reglas incluyen dispositivos_notificaciones', reglas.includes('match /dispositivos_notificaciones/{doc}'));
 
 for (const nombre of ok) console.log(`OK  ${nombre}`);

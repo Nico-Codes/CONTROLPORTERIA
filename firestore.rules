@@ -15,11 +15,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Registros de auditoría: solo se crean. No se modifican ni se borran desde la app.
-    // La retención de 60 días se aplica con una política TTL sobre el campo expiraEn.
+    // Registros de auditoría: se crean desde la app y se eliminan en lotes los
+    // registros con más de 60 días. No se permite modificar un registro existente.
     match /registros_ronda/{doc} {
-      allow read, create: if true;
-      allow update, delete: if false;
+      allow read, create, delete: if true;
+      allow update: if false;
     }
 
     // Tokens de dispositivos para notificaciones push.

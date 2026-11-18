@@ -1208,8 +1208,9 @@
                 cargarRegistrosHoy()
             ]);
             await sincronizarColaOffline();
+            // Limpieza silenciosa de registros con más de 60 días.
+            limpiarRegistrosAntiguos();
 
-            // Si la pestaña ya tenía una sesión de encargado, recargar su panel completo.
             if (sessionStorage.getItem('sesion_encargado') === 'activa') {
                 await cargarDatosPanelAdmin();
                 renderizarTodoAdmin();
@@ -2493,6 +2494,38 @@
             const tareas = [cargarRegistrosHoy()];
             if (offsetDiasFiltro !== 0) tareas.push(cargarRegistrosAdmin());
             await Promise.all(tareas);
+        }
+
+        // Retención efectiva sin Cloud Functions: elimina en lotes los registros
+        // con más de DIAS_RETENCION días. La política TTL de Firestore queda como
+        // alternativa si el proyecto pasa a un plan con facturación habilitada.
+        async function limpiarRegistrosAntiguos() {
+            if (!navigator.onLine) return 0;
+            const corte = Date.now() - RETENCION_MS;
+            let eliminados = 0;
+
+            try {
+                for (let lote = 0; lote < 5; lote++) {
+                    const snap = await getDocs(query(
+                        collection(db, "registros_ronda"),
+                        where("timestampMs", "<", corte),
+                        orderBy("timestampMs", "asc"),
+                        limit(400)
+                    ));
+                    if (snap.empty) break;
+
+                    const batch = writeBatch(db);
+                    snap.forEach(d => batch.delete(d.ref));
+                    await batch.commit();
+                    eliminados += snap.size;
+                    if (snap.size < 400) break;
+                }
+                if (eliminados > 0) console.info(`[Retención] ${eliminados} registros antiguos eliminados.`);
+            } catch (e) {
+                console.warn('[Retención] No se pudieron eliminar registros antiguos:', e);
+            }
+
+            return eliminados;
         }
 
         window.cambiarTabAdmin = (tab) => {

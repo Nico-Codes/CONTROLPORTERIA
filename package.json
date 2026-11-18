@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node tests/validar-index.mjs && node tests/validar-reglas.mjs",
+    "test": "node tests/validar-index.mjs && node tests/validar-reglas.mjs && vitest run",
+    "test:unit": "vitest run",
     "test:html": "node tests/validar-index.mjs",
     "test:reglas": "node tests/validar-reglas.mjs",
     "serve": "python -m http.server 8123 --directory public"

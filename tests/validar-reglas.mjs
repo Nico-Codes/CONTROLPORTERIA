@@ -40,7 +40,7 @@ comprobar('La cola offline reconstruye las fechas', contiene('itemFs.expiraEn = 
 
 // Regla de escaneo por horario
 comprobar('Solo un registro OK completa una ruta', /function registroCorrespondeARuta\(reg, ruta\) \{\s*if \(!reg \|\| !ruta \|\| reg\.severidad !== "OK"\) return false;/.test(html));
-comprobar('La agenda usa rutaCompletada', contiene('const yaEscaneado = rutaCompletada(regsHoy, ruta);'));
+comprobar('La agenda usa registroCorrespondeARuta', contiene('const regOk = regsHoy.find(reg => registroCorrespondeARuta(reg, r));'));
 comprobar('El escaneo prioriza la ruta pendiente más temprana', contiene('const pendientes = rutasPunto.filter(r => !rutaCompletada(regsHoy, r));'));
 
 // Panel

@@ -2241,7 +2241,7 @@
                             const tit = payload.notification?.title || payload.data?.title || "Control de Rondas";
                             const msg = payload.notification?.body || payload.data?.body || "";
                             const sev = payload.data?.severidad || "info";
-                            lanzarNotificacionSistema(tit, msg, sev);
+                                // Notificacion suprimida: las alertas push se gestionan solo por el emisor externo (Vercel + cron).
                         });
                     } catch (errFCM) {
                         console.warn('[FCM] Error inicializando messaging:', errFCM);

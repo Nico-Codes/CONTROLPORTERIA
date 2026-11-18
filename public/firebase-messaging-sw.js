@@ -36,12 +36,8 @@ if (messaging) {
     messaging.onBackgroundMessage((payload) => {
         console.log('[SW] Push recibido en segundo plano:', payload);
 
-        // Si el mensaje trae un bloque `notification`, FCM ya muestra una notificación
-        // automáticamente. Mostrar otra aquí duplicaría el aviso.
-        if (payload.notification) return;
-
-        const title = payload.data?.title || "Control de Rondas · Meatex";
-        const body = payload.data?.body || "Aviso del sistema de rondas.";
+        const title = payload.notification?.title || payload.data?.title || "Control de Rondas · Meatex";
+        const body = payload.notification?.body || payload.data?.body || "Aviso del sistema de rondas.";
         const severidad = payload.data?.severidad || "info";
 
         const options = {
@@ -49,7 +45,8 @@ if (messaging) {
             icon: "/icon-192.png",
             badge: "/badge-72.png",
             vibrate: severidad === "CRITICO" ? [300, 100, 300, 100, 400] : [200, 100, 200],
-            tag: payload.data?.tag || "ronda-alert-" + Date.now(),
+            // Tag estable para evitar notificaciones duplicadas del mismo mensaje.
+            tag: payload.data?.tag || payload.notification?.title || "ronda-alerta",
             renotify: true,
             requireInteraction: severidad === "CRITICO",
             data: payload.data || {}

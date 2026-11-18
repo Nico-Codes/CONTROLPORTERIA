@@ -1,6 +1,9 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, addDoc, setDoc, getDocs, deleteDoc, updateDoc, doc, query, where, orderBy, limit, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+import { calcularDistanciaMetros, estaDentroDeRadio } from "./utils/geo.js";
+import { obtenerIniciales, formatearHora24, formatearDeltaMinutos, escapeHtml, obtenerFechaHoyISO } from "./utils/format.js";
+import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMargenRegistro, obtenerToleranciaRegistro } from "./domain/rondas.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyAl9AqfZzwojhuB_7QPFS0kfMbw5dfdI-4",
@@ -53,36 +56,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
         let timerAvisoPanel = null;
         let escaneoEnProceso = false;
 
-        function formatearHora24(dateObj) {
-            if (!dateObj || isNaN(dateObj.getTime())) return "—";
-            return `${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
-        }
-
-        function obtenerIniciales(nombre) {
-            if (!nombre || typeof nombre !== 'string') return "OP";
-            const partes = nombre.trim().split(/\s+/);
-            return partes.map(n => n[0] || '').join('').substring(0, 2).toUpperCase() || "OP";
-        }
-
-        function formatearDeltaMinutos(mins) {
-            const abs = Math.abs(mins);
-            if (abs < 60) return `${abs} min`;
-            const h = Math.floor(abs / 60);
-            const m = abs % 60;
-            return m > 0 ? `${h} h ${m} min` : `${h} h`;
-        }
-
-        function escapeHtml(valor) {
-            return String(valor ?? '').replace(/[&<>"']/g, c => ({
-                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-            }[c]));
-        }
-
-        function obtenerFechaHoyISO() {
-            const d = new Date();
-            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        }
-
         function generarCodigoPuntoUnico() {
             let codigo;
             do {
@@ -94,35 +67,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
         function existePuntoConNombre(nombre) {
             const buscado = String(nombre || '').trim().toLowerCase();
             return Object.values(puntosCache).some(p => String(p.nombre || '').trim().toLowerCase() === buscado);
-        }
-
-        function registroCorrespondeARuta(reg, ruta) {
-            if (!reg || !ruta || reg.severidad !== "OK") return false;
-            if (reg.rutaId && ruta.id && reg.rutaId === ruta.id) return true;
-            // Compatibilidad con registros antiguos o rutas recreadas sin rutaId.
-            return reg.codigoQR === ruta.codigoQR &&
-                String(reg.horarioProgramado || "") === String(ruta.hora || "");
-        }
-
-        function rutaCompletada(registros, ruta) {
-            return registros.some(reg => registroCorrespondeARuta(reg, ruta));
-        }
-
-        function obtenerMargenRegistro(reg) {
-            const margenPropio = Number(reg && reg.margen);
-            if (reg && reg.margen !== null && reg.margen !== undefined && !isNaN(margenPropio)) return margenPropio;
-            const ruta = rutasCache.find(r =>
-                (reg && reg.rutaId && r.id === reg.rutaId) ||
-                (r.codigoQR === (reg && reg.codigoQR) && String(r.hora || '') === String((reg && reg.horarioProgramado) || ''))
-            );
-            const margenRuta = Number(ruta && ruta.margen);
-            return !isNaN(margenRuta) ? margenRuta : 15;
-        }
-
-        function obtenerToleranciaRegistro(reg, punto) {
-            const toleranciaPropia = Number(reg && reg.tolerancia);
-            if (reg && reg.tolerancia !== null && reg.tolerancia !== undefined && !isNaN(toleranciaPropia)) return toleranciaPropia;
-            return Number(punto && punto.tolerancia) || 25;
         }
 
         function mostrarAvisoPanel(texto, tipo = "ok") {
@@ -635,13 +579,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
             }
             document.getElementById('caja-camara').classList.add('hidden');
         };
-
-        function calcularDistanciaMetros(lat1, lon1, lat2, lon2) {
-            const R = 6371e3, rad = Math.PI / 180;
-            const dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
-            const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
-            return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-        }
 
         function mostrarPantallaValidando() {
             ['qr', 'gps', 'hora'].forEach(step => {
@@ -1697,7 +1634,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
                 const codigoPt = pt ? pt.codigo : (r.codigoQR || "—");
                 const iniciales = obtenerIniciales(r.operador);
                 const [fechaTxt, horaTxt] = r.fechaTexto ? r.fechaTexto.split(' ') : ["", r.fechaTexto || "00:00"];
-                const margenReg = obtenerMargenRegistro(r);
+                const margenReg = obtenerMargenRegistro(r, rutasCache);
 
                 let progHtml = `<span class="text-[#94A3B8]">Sin agenda</span>`;
                 let desvioHtml = `<span class="text-[#CBD5E1]">—</span>`;
@@ -2470,7 +2407,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
             const filas = registros.map(r => {
                 const [fechaTxt, horaTxt] = r.fechaTexto ? r.fechaTexto.split(' ') : ["", ""];
                 const hora = horaTxt || (r.timestampMs ? formatearHoraDeMs(r.timestampMs) : "");
-                const margen = obtenerMargenRegistro(r);
+                const margen = obtenerMargenRegistro(r, rutasCache);
                 let desvio = "";
                 if (r.timestampMs && r.horarioProgramado && r.horarioProgramado !== "Sin agenda") {
                     const [hP, mP] = r.horarioProgramado.split(':').map(Number);

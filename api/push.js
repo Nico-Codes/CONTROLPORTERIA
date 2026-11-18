@@ -74,7 +74,7 @@ async function enviarProactivos(db, messaging, tokens) {
         const diffMin = Math.round((ahora.getTime() - obj.getTime()) / 60000);
         const margen = Number(ruta.margen) || 15;
 
-        if (diffMin <= -4 && diffMin >= -6) grupoPrevio.push(ruta);
+        if (diffMin <= -7 && diffMin >= -9) grupoPrevio.push(ruta);
 
         const minParaFin = margen - diffMin;
         if (diffMin > 0 && minParaFin <= 3 && minParaFin >= 0) grupoVence.push(ruta);
@@ -86,7 +86,7 @@ async function enviarProactivos(db, messaging, tokens) {
     const alertas = alertasSnap.exists ? (alertasSnap.data() || {}) : {};
     const nowMs = Date.now();
 
-    const cooldowns = { lote_5m: 15 * 60 * 1000, lote_3m: 10 * 60 * 1000, lote_inc: 60 * 60 * 1000 };
+    const cooldowns = { lote_8m: 15 * 60 * 1000, lote_3m: 10 * 60 * 1000, lote_inc: 60 * 60 * 1000 };
 
     async function enviarGrupo(grupo, cooldownKey, titulo, bodyFn, severidad, tag) {
         if (grupo.length === 0 || tokens.length === 0) return;
@@ -112,16 +112,16 @@ async function enviarProactivos(db, messaging, tokens) {
         }
     }
 
-    await enviarGrupo(grupoPrevio, 'lote_5m', 'Punto de Ronda Próximo',
-        c => c === 1 ? 'Tenés 1 punto de ronda pendiente por cubrir en 5 minutos.' : `Tenés ${c} puntos de ronda pendientes por cubrir en 5 minutos.`,
-        'info', 'ronda-lote-5min');
+    await enviarGrupo(grupoPrevio, 'lote_8m', 'Punto de Ronda Próximo',
+        c => c === 1 ? 'Se acerca la hora de 1 punto de ronda. Preparate para escanear.' : `Se acercan las horas de ${c} puntos de ronda. Preparate para escanear.`,
+        'info', 'ronda-lote-8min');
 
     await enviarGrupo(grupoVence, 'lote_3m', 'Vencimiento de Ventana',
-        c => c === 1 ? 'Tenés 1 punto de ronda por vencer en 3 minutos. Ingresá a escanearlo.' : `Tenés ${c} puntos de ronda por vencer en 3 minutos. Ingresá a escanearlos.`,
+        c => c === 1 ? 'Está por vencer un punto de ronda en los próximos minutos.' : `Están por vencer ${c} puntos de ronda en los próximos minutos.`,
         'ADVERTENCIA', 'ronda-lote-vence-3min');
 
     await enviarGrupo(grupoIncumplido, 'lote_inc', 'Incumplimiento de Ronda',
-        c => c === 1 ? 'El tiempo límite para 1 punto de ronda ha vencido sin escanearse.' : `El tiempo límite para ${c} puntos de ronda ha vencido sin escanearse.`,
+        c => c === 1 ? 'El tiempo límite de 1 punto de ronda ha vencido sin escanearse.' : `El tiempo límite de ${c} puntos de ronda ha vencido sin escanearse.`,
         'CRITICO', 'ronda-lote-incumplido');
 }
 

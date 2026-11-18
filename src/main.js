@@ -2491,3 +2491,47 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 mostrarAvisoPanel(`${registros.length} registros exportados a XLSX.`, 'ok');
             }
         };
+
+
+// === Instalacion PWA (Add to Home Screen) ===
+let deferredInstallPrompt = null;
+let installPromptListo = false;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    installPromptListo = true;
+    const banner = document.getElementById('banner-instalar');
+    if (banner) banner.classList.remove('hidden');
+});
+window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    const banner = document.getElementById('banner-instalar');
+    if (banner) banner.classList.add('hidden');
+});
+document.addEventListener('DOMContentLoaded', () => {
+    if (installPromptListo) {
+        const banner = document.getElementById('banner-instalar');
+        if (banner) banner.classList.remove('hidden');
+    }
+    const btnInstalar = document.getElementById('btn-instalar');
+    const btnCerrar = document.getElementById('btn-cerrar-instalar');
+    if (btnInstalar) {
+        btnInstalar.addEventListener('click', async () => {
+            if (!deferredInstallPrompt) return;
+            deferredInstallPrompt.prompt();
+            const { outcome } = await deferredInstallPrompt.userChoice;
+            if (outcome === 'accepted') {
+                const banner = document.getElementById('banner-instalar');
+                if (banner) banner.classList.add('hidden');
+            }
+            deferredInstallPrompt = null;
+        });
+    }
+    if (btnCerrar) {
+        btnCerrar.addEventListener('click', () => {
+            const banner = document.getElementById('banner-instalar');
+            if (banner) banner.classList.add('hidden');
+            deferredInstallPrompt = null;
+        });
+    }
+});

@@ -90,7 +90,7 @@ Para push real con la app cerrada se necesita:
 
 1. Una clave pública VAPID de Firebase Console → Cloud Messaging → **Certificados push web**.
 2. Pegarla en la constante `VAPID_KEY` de `public/index.html`.
-3. Un emisor de push (Cloud Function o servidor) que lea los tokens de `dispositivos_notificaciones` y envíe los mensajes. El repositorio no incluye ese emisor.
+3. Un emisor de push (Cloud Function, servidor o cron job) que lea los tokens de `dispositivos_notificaciones` y envíe los mensajes. Este repositorio incluye un emisor gratuito basado en Vercel + cron-job.org (cada 1 minuto).
 
 Sin VAPID, `getToken()` falla y no se registran tokens nuevos. El código actual registra el error en consola y continúa.
 

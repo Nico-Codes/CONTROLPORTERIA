@@ -98,7 +98,8 @@ async function enviarProactivos(db, messaging, tokens) {
             await messaging.sendEachForMulticast({
                 tokens,
                 data: { title: titulo, body, severidad, tag, punto: grupo.map(r => r.puntoNombre).join(', ') },
-                android: { priority: severidad === 'CRITICO' ? 'high' : 'normal' }
+                android: { priority: 'high' },
+                webpush: { headers: { Urgency: 'high' } }
             });
             alertas[key] = nowMs;
             await alertasRef.set(alertas, { merge: true });
@@ -169,7 +170,8 @@ module.exports = async (req, res) => {
                             punto: reg.puntoNombre || '',
                             operador: reg.operador || ''
                         },
-                        android: { priority: critico ? 'high' : 'normal' }
+                        android: { priority: 'high' },
+                        webpush: { headers: { Urgency: 'high' } }
                     });
                     enviados += resp.successCount;
                     if (resp.failureCount > 0) {

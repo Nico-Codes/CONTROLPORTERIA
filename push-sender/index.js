@@ -69,7 +69,8 @@ async function enviarProactivos(tokens) {
             await messaging.sendEachForMulticast({
                 tokens,
                 data: { title: titulo, body: bodyFn(cant), severidad, tag, punto: grupo.map(r => r.puntoNombre).join(', ') },
-                android: { priority: severidad === 'CRITICO' ? 'high' : 'normal' }
+                android: { priority: 'high' },
+                webpush: { headers: { Urgency: 'high' } }
             });
             alertas[key] = nowMs;
             await alertasRef.set(alertas, { merge: true });
@@ -124,7 +125,8 @@ async function main() {
             const resp = await messaging.sendEachForMulticast({
                 tokens,
                 data: { title, body, severidad: reg.severidad, tag: critico ? 'ronda-critico' : 'ronda-desvio', punto: reg.puntoNombre || '', operador: reg.operador || '' },
-                android: { priority: critico ? 'high' : 'normal' }
+                android: { priority: 'high' },
+                webpush: { headers: { Urgency: 'high' } }
             });
             enviados += resp.successCount;
             if (resp.failureCount > 0) console.warn(`Envío parcial: ${resp.successCount} ok, ${resp.failureCount} fallos.`);

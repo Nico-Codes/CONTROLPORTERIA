@@ -1,0 +1,12 @@
+{
+  "name": "control-rondas-meatex",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PWA de control de rondas con QR, GPS y ventanas horarias",
+  "scripts": {
+    "test": "node tests/validar-index.mjs && node tests/validar-reglas.mjs",
+    "test:html": "node tests/validar-index.mjs",
+    "test:reglas": "node tests/validar-reglas.mjs",
+    "serve": "python -m http.server 8123 --directory public"
+  }
+}

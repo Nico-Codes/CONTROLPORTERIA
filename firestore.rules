@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Catálogos administrados desde el panel del encargado.
+    match /operadores/{doc} {
+      allow read, write: if true;
+    }
+
+    match /puntos_control/{doc} {
+      allow read, write: if true;
+    }
+
+    match /rutas_horarias/{doc} {
+      allow read, write: if true;
+    }
+
+    // Registros de auditoría: solo se crean. No se modifican ni se borran desde la app.
+    // La retención de 60 días se aplica con una política TTL sobre el campo expiraEn.
+    match /registros_ronda/{doc} {
+      allow read, create: if true;
+      allow update, delete: if false;
+    }
+
+    // Tokens de dispositivos para notificaciones push.
+    match /dispositivos_notificaciones/{doc} {
+      allow read, write: if true;
+    }
+  }
+}

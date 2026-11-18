@@ -422,18 +422,18 @@
 
     <!-- HEADER ENCARGADO -->
     <header id="header-encargado" class="hidden sticky top-0 z-40 bg-white border-b border-[#E2E8F0]">
-        <div class="max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-lg bg-[#0F172A] text-white flex items-center justify-center text-base shadow-xs">
+        <div class="max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8 min-h-[56px] py-2 flex items-center justify-between gap-2 flex-wrap">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="w-9 h-9 rounded-lg bg-[#0F172A] text-white flex items-center justify-center text-base shadow-xs shrink-0">
                     <i class="fa-solid fa-shield-halved"></i>
                 </div>
-                <div>
-                    <h1 class="text-base font-semibold text-[#0F172A]">Control de Rondas</h1>
-                    <p class="text-[11px] text-[#64748B]">Meatex · Panel de Supervisor</p>
+                <div class="min-w-0">
+                    <h1 class="text-sm sm:text-base font-semibold text-[#0F172A] truncate">Control de Rondas</h1>
+                    <p class="text-[11px] text-[#64748B] truncate">Meatex · Panel de Supervisor</p>
                 </div>
             </div>
 
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 flex-wrap justify-end">
                 <div class="hidden sm:flex items-center gap-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg p-1">
                     <button onclick="cambiarFechaFiltro(-1)" class="w-7 h-7 rounded hover:bg-white text-[#334155] flex items-center justify-center transition shadow-xs"><i class="fa-solid fa-chevron-left text-xs"></i></button>
                     <span id="header-fecha-larga" class="px-3 text-xs font-medium text-[#0F172A] capitalize">Hoy, 17 nov 2026</span>
@@ -452,13 +452,13 @@
 
                 <button onclick="cerrarSesionEncargado()" class="h-9 px-3.5 bg-white border border-red-200 hover:bg-red-50 text-red-600 rounded-lg text-xs font-semibold flex items-center gap-2 transition shadow-xs">
                     <i class="fa-solid fa-right-from-bracket"></i>
-                    <span>Salir</span>
+                    <span class="hidden sm:inline">Salir</span>
                 </button>
             </div>
         </div>
 
         <div class="border-t border-[#E2E8F0] bg-[#F8FAFC]/50">
-            <div class="max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8 flex gap-8 overflow-x-auto">
+            <div class="max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8 flex gap-8 overflow-x-auto py-2">
                 <button onclick="cambiarTabAdmin('auditoria')" id="tab-auditoria" class="pb-3 text-sm font-medium border-b-2 border-[#0F172A] text-[#0F172A] flex items-center gap-2.5 whitespace-nowrap shrink-0 transition">
                     <i class="fa-solid fa-list-check"></i>
                     <span>Auditoría</span>

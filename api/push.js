@@ -54,7 +54,10 @@ async function enviarProactivos(db, messaging, tokens) {
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(r => r.dia === hoyNombre || r.dia === 'Todos');
 
-    if (rutasHoy.length === 0) return;
+    if (rutasHoy.length === 0) {
+        console.log('[Push] Sin rutas para hoy.');
+        return;
+    }
 
     const regsSnap = await db.collection('registros_ronda').where('fechaISO', '==', hoyISO).get();
     const regsHoy = regsSnap.docs.map(d => d.data());
@@ -103,6 +106,7 @@ async function enviarProactivos(db, messaging, tokens) {
             });
             alertas[key] = nowMs;
             await alertasRef.set(alertas, { merge: true });
+            console.log(`[Push] Enviado "${titulo}" para ${grupo.length} ruta(s).`);
         } catch (err) {
             console.error('Error enviando push proactivo:', err.message);
         }
@@ -129,6 +133,7 @@ module.exports = async (req, res) => {
 
         const tokensSnap = await db.collection('dispositivos_notificaciones').get();
         const tokens = tokensSnap.docs.map(d => d.data().token).filter(Boolean);
+        console.log(`[Push] Tokens registrados: ${tokens.length} (docs: ${tokensSnap.size})`);
 
         // 1) Alertas proactivas (próximo, vencimiento, incumplimiento).
         await enviarProactivos(db, messaging, tokens);

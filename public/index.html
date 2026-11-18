@@ -2296,30 +2296,10 @@
         }
 
         function iniciarListenerIncidenciasSupervisor() {
-            if (unsubscribeIncidenciasSupervisor) return;
-            try {
-                const ahora = Date.now();
-                const q = query(collection(db, "registros_ronda"), orderBy("timestampMs", "desc"), limit(5));
-                unsubscribeIncidenciasSupervisor = onSnapshot(q, (snapshot) => {
-                    snapshot.docChanges().forEach((change) => {
-                        if (change.type === "added") {
-                            const reg = change.doc.data();
-                            // Filtrar eventos ocurridos durante la sesión de supervisión activa (últimos 8 segundos)
-                            if (reg.timestampMs && reg.timestampMs > (ahora - 8000)) {
-                                if (reg.severidad === "CRITICO") {
-                                    lanzarNotificacionSistema("⚠️ INCIDENCIA CRÍTICA", `${reg.operador || 'Guardia'}: ${reg.puntoNombre} - ${reg.estado}`, "CRITICO");
-                                } else if (reg.severidad === "ADVERTENCIA") {
-                                    lanzarNotificacionSistema("⚠️ Desvío de Ronda", `${reg.operador || 'Guardia'}: ${reg.puntoNombre} - ${reg.estado}`, "ADVERTENCIA");
-                                }
-                            }
-                        }
-                    });
-                }, (err) => {
-                    console.warn('[Supervisor] Error en listener de incidencias:', err);
-                });
-            } catch (e) {
-                console.warn('[Supervisor] No se pudo activar listener de incidencias:', e);
-            }
+            // Deshabilitado: las notificaciones push se envían únicamente mediante
+            // el emisor externo (Vercel + cron-job.org) para que solo lleguen con la
+            // app cerrada y no se dupliquen con el motor interno.
+            return;
         }
 
         function detenerListenerIncidenciasSupervisor() {
@@ -2342,88 +2322,10 @@
         }
 
         function iniciarMotorAlertasOperador() {
-            setInterval(() => {
-                if (!operadorActivo) return;
-
-                const ahora = new Date();
-                const hoyNombre = DIAS_SEMANA[ahora.getDay()];
-                const rutasHoy = rutasCache.filter(r => r.dia === hoyNombre || r.dia === "Todos");
-                const regsHoy = registrosCache.filter(r => r.fechaISO === obtenerFechaHoyISO());
-
-                const grupoPrevio5Min = [];
-                const grupoVence3Min = [];
-                const grupoIncumplidos = [];
-
-                rutasHoy.forEach(ruta => {
-                    // Cada horario programado exige su propio escaneo válido.
-                    const yaEscaneado = rutaCompletada(regsHoy, ruta);
-                    if (yaEscaneado) return;
-
-                    const [hP, mP] = (ruta.hora || "00:00").split(':').map(Number);
-                    const objMeta = new Date(ahora);
-                    objMeta.setHours(hP, mP, 0, 0);
-                    const diffMinutos = Math.round((ahora.getTime() - objMeta.getTime()) / 60000);
-                    const margen = ruta.margen || 15;
-
-                    // 1) Faltan 5 minutos para un punto pendiente (entre 4 y 6 minutos antes de la hora)
-                    if (diffMinutos <= -4 && diffMinutos >= -6) {
-                        grupoPrevio5Min.push(ruta);
-                    }
-
-                    // 2) Alerta por vencimiento de ventana en 3 minutos (restan 3 min o menos antes del límite de tolerancia)
-                    const minutosParaFinMargen = margen - diffMinutos;
-                    if (diffMinutos > 0 && minutosParaFinMargen <= 3 && minutosParaFinMargen >= 0) {
-                        grupoVence3Min.push(ruta);
-                    } else if (diffMinutos > margen) {
-                        // 3) Incumplimiento de ronda (se superó el margen de tolerancia).
-                        // Solo se notifica si no hubo ningún escaneo para esta ruta: si el guardia
-                        // escaneó (aunque sea fuera de horario o fuera de rango), el emisor de push
-                        // ya envió la notificación correspondiente y no se debe duplicar.
-                        const huboEscaneo = regsHoy.some(reg =>
-                            reg.codigoQR === ruta.codigoQR &&
-                            (String(reg.horarioProgramado || '') === String(ruta.hora || ''))
-                        );
-                        if (!huboEscaneo) grupoIncumplidos.push(ruta);
-                    }
-                });
-
-                // --- 1. Emisión consolidada: Faltan 5 minutos ---
-                if (grupoPrevio5Min.length > 0) {
-                    const hash5m = grupoPrevio5Min.map(r => r.codigoQR + '@' + r.hora).sort().join(',');
-                    if (debeEmitirAlerta(`lote_5m_${hash5m}`, 15 * 60 * 1000)) {
-                        const cant = grupoPrevio5Min.length;
-                        const txt = cant === 1
-                            ? "Tenés 1 punto de ronda pendiente por cubrir en 5 minutos."
-                            : `Tenés ${cant} puntos de ronda pendientes por cubrir en 5 minutos.`;
-                        lanzarNotificacionSistema("Punto de Ronda Próximo", txt, "info", "ronda-lote-5min");
-                    }
-                }
-
-                // --- 2. Emisión consolidada: Vencimiento de ventana en 3 minutos ---
-                if (grupoVence3Min.length > 0) {
-                    const hash3m = grupoVence3Min.map(r => r.codigoQR + '@' + r.hora).sort().join(',');
-                    if (debeEmitirAlerta(`lote_3m_${hash3m}`, 10 * 60 * 1000)) {
-                        const cant = grupoVence3Min.length;
-                        const txt = cant === 1
-                            ? "Tenés 1 punto de ronda por vencer en 3 minutos. Ingresá a escanearlo."
-                            : `Tenés ${cant} puntos de ronda por vencer en 3 minutos. Ingresá a escanearlos.`;
-                        lanzarNotificacionSistema("Vencimiento de Ventana", txt, "ADVERTENCIA", "ronda-lote-vence-3min");
-                    }
-                }
-
-                // --- 3. Emisión consolidada: Incumplimiento de ronda ---
-                if (grupoIncumplidos.length > 0) {
-                    const hashInc = grupoIncumplidos.map(r => r.codigoQR + '@' + r.hora).sort().join(',');
-                    if (debeEmitirAlerta(`lote_inc_${hashInc}`, 60 * 60 * 1000)) {
-                        const cant = grupoIncumplidos.length;
-                        const txt = cant === 1
-                            ? "El tiempo límite para 1 punto de ronda ha vencido sin escanearse."
-                            : `El tiempo límite para ${cant} puntos de ronda ha vencido sin escanearse.`;
-                        lanzarNotificacionSistema("Incumplimiento de Ronda", txt, "CRITICO", "ronda-lote-incumplido");
-                    }
-                }
-
-            }, 30000);
+            // Deshabilitado: las notificaciones push se envían únicamente mediante
+            // el emisor externo (Vercel + cron-job.org). El motor interno solo
+            // generaba notificaciones duplicadas con el cron.
+            return;
         }
 
         async function lanzarNotificacionSistema(titulo, texto, severidad = "info", tagPersonalizado = null) {

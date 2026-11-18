@@ -2375,8 +2375,15 @@
                     if (diffMinutos > 0 && minutosParaFinMargen <= 3 && minutosParaFinMargen >= 0) {
                         grupoVence3Min.push(ruta);
                     } else if (diffMinutos > margen) {
-                        // 3) Incumplimiento de ronda (se superó el margen de tolerancia)
-                        grupoIncumplidos.push(ruta);
+                        // 3) Incumplimiento de ronda (se superó el margen de tolerancia).
+                        // Solo se notifica si no hubo ningún escaneo para esta ruta: si el guardia
+                        // escaneó (aunque sea fuera de horario o fuera de rango), el emisor de push
+                        // ya envió la notificación correspondiente y no se debe duplicar.
+                        const huboEscaneo = regsHoy.some(reg =>
+                            reg.codigoQR === ruta.codigoQR &&
+                            (String(reg.horarioProgramado || '') === String(ruta.hora || ''))
+                        );
+                        if (!huboEscaneo) grupoIncumplidos.push(ruta);
                     }
                 });
 

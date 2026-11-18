@@ -3346,16 +3346,6 @@
 <div id="grilla">${tarjetas}</div>
 <script>window.onload = function () { window.print(); };<\/script>
 
-    <!-- Banner de instalacion PWA -->
-    <div id="banner-instalar" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-[400px] w-[calc(100%-2rem)] bg-[#0F172A] text-white rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3">
-        <i class="fa-solid fa-download text-lg shrink-0"></i>
-        <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold">Instalar app</p>
-            <p class="text-[11px] text-white/70">Agrega Rondas Meatex a tu pantalla de inicio para recibir notificaciones.</p>
-        </div>
-        <button id="btn-instalar" class="h-8 px-3 bg-white text-[#0F172A] rounded-lg text-xs font-semibold shrink-0">Instalar</button>
-        <button id="btn-cerrar-instalar" class="h-8 w-8 text-white/60 hover:text-white flex items-center justify-center shrink-0" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
-    </div>
 </body>
 </html>`);
             win.document.close();
@@ -3554,5 +3544,15 @@
             }
         };
     </script>
+    <!-- Banner de instalacion PWA -->
+    <div id="banner-instalar" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-[400px] w-[calc(100%-2rem)] bg-[#0F172A] text-white rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3">
+        <i class="fa-solid fa-download text-lg shrink-0"></i>
+        <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold">Instalar app</p>
+            <p class="text-[11px] text-white/70">Agrega Rondas Meatex a tu pantalla de inicio para recibir notificaciones.</p>
+        </div>
+        <button id="btn-instalar" class="h-8 px-3 bg-white text-[#0F172A] rounded-lg text-xs font-semibold shrink-0">Instalar</button>
+        <button id="btn-cerrar-instalar" class="h-8 w-8 text-white/60 hover:text-white flex items-center justify-center shrink-0" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+    </div>
 </body>
 </html>

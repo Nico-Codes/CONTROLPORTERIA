@@ -102,41 +102,63 @@ async function main() {
 
     const snap = await db.collection('registros_ronda').where('timestampMs', '>', lastMs).orderBy('timestampMs', 'asc').limit(200).get();
 
-    if (snap.empty) {
-        await cursorRef.set({ lastMs: Date.now(), actualizadoEn: new Date().toISOString() }, { merge: true });
-        console.log('Sin registros nuevos.');
-        return;
-    }
-
     let maxMs = lastMs;
     let enviados = 0;
 
-    for (const doc of snap.docs) {
-        const reg = doc.data();
-        if (typeof reg.timestampMs === 'number') maxMs = Math.max(maxMs, reg.timestampMs);
-        if (reg.severidad !== 'CRITICO' && reg.severidad !== 'ADVERTENCIA') continue;
-        if (tokens.length === 0) continue;
+    if (!snap.empty) {
+        for (const doc of snap.docs) {
+            const reg = doc.data();
+            if (typeof reg.timestampMs === 'number') maxMs = Math.max(maxMs, reg.timestampMs);
+            if (reg.severidad !== 'CRITICO' && reg.severidad !== 'ADVERTENCIA') continue;
+            if (tokens.length === 0) continue;
 
-        const critico = reg.severidad === 'CRITICO';
-        const title = critico ? '⚠️ Incidencia crítica' : '⚠️ Desvío de ronda';
-        const body = `${reg.operador || 'Guardia'}: ${reg.puntoNombre || 'Punto'} - ${reg.estado || ''}`.trim();
+            const critico = reg.severidad === 'CRITICO';
+            const title = critico ? '⚠️ Incidencia crítica' : '⚠️ Desvío de ronda';
+            const body = `${reg.operador || 'Guardia'}: ${reg.puntoNombre || 'Punto'} - ${reg.estado || ''}`.trim();
 
-        try {
-            const resp = await messaging.sendEachForMulticast({
-                tokens,
-                data: { title, body, severidad: reg.severidad, tag: critico ? 'ronda-critico' : 'ronda-desvio', punto: reg.puntoNombre || '', operador: reg.operador || '' },
-                android: { priority: 'high' },
-                webpush: { headers: { Urgency: 'high' } }
-            });
-            enviados += resp.successCount;
-            if (resp.failureCount > 0) console.warn(`Envío parcial: ${resp.successCount} ok, ${resp.failureCount} fallos.`);
-        } catch (err) {
-            console.error('Error enviando push:', err.message);
+            try {
+                const resp = await messaging.sendEachForMulticast({
+                    tokens,
+                    data: { title, body, severidad: reg.severidad, tag: critico ? 'ronda-critico' : 'ronda-desvio', punto: reg.puntoNombre || '', operador: reg.operador || '' },
+                    android: { priority: 'high' },
+                    webpush: { headers: { Urgency: 'high' } }
+                });
+                enviados += resp.successCount;
+                if (resp.failureCount > 0) console.warn(`Envío parcial: ${resp.successCount} ok, ${resp.failureCount} fallos.`);
+            } catch (err) {
+                console.error('Error enviando push:', err.message);
+            }
         }
+        await cursorRef.set({ lastMs: maxMs, actualizadoEn: new Date().toISOString() }, { merge: true });
+    } else {
+        await cursorRef.set({ lastMs: Date.now(), actualizadoEn: new Date().toISOString() }, { merge: true });
+        console.log('Sin registros nuevos.');
     }
 
-    await cursorRef.set({ lastMs: maxMs, actualizadoEn: new Date().toISOString() }, { merge: true });
-    console.log(`Procesados ${snap.size} registros. Push enviados: ${enviados}. Cursor: ${maxMs}`);
+    // Limpieza de retencion (una vez por dia).
+    try {
+        const cursorData = (await cursorRef.get()).data() || {};
+        const lastCleanup = cursorData.lastCleanup || 0;
+        if (Date.now() - lastCleanup > 24 * 60 * 60 * 1000) {
+            const corte = Date.now() - 60 * 24 * 60 * 60 * 1000;
+            let eliminados = 0;
+            for (let i = 0; i < 3; i++) {
+                const oldSnap = await db.collection('registros_ronda').where('timestampMs', '<', corte).orderBy('timestampMs', 'asc').limit(400).get();
+                if (oldSnap.empty) break;
+                const batch = db.batch();
+                oldSnap.forEach(d => batch.delete(d.ref));
+                await batch.commit();
+                eliminados += oldSnap.size;
+                if (oldSnap.size < 400) break;
+            }
+            await cursorRef.set({ lastCleanup: Date.now() }, { merge: true });
+            if (eliminados > 0) console.log(`Limpieza: ${eliminados} registros antiguos eliminados.`);
+        }
+    } catch (e) {
+        console.warn('Error en limpieza:', e.message);
+    }
+
+    if (!snap.empty) console.log(`Procesados ${snap.size} registros. Push enviados: ${enviados}. Cursor: ${maxMs}`);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

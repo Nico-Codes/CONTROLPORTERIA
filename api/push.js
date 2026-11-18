@@ -59,7 +59,7 @@ async function enviarProactivos(db, messaging, tokens) {
         return;
     }
 
-    const regsSnap = await db.collection('registros_ronda').where('fechaISO', '==', hoyISO).get();
+    const regsSnap = await db.collection('registros_ronda').where('fechaISO', '==', hoyISO).limit(500).get();
     const regsHoy = regsSnap.docs.map(d => d.data());
 
     const grupoPrevio = [];
@@ -74,10 +74,10 @@ async function enviarProactivos(db, messaging, tokens) {
         const diffMin = Math.round((ahora.getTime() - obj.getTime()) / 60000);
         const margen = Number(ruta.margen) || 15;
 
-        if (diffMin <= -7 && diffMin >= -9) grupoPrevio.push(ruta);
+        if (diffMin <= -3 && diffMin >= -12) grupoPrevio.push(ruta);
 
         const minParaFin = margen - diffMin;
-        if (diffMin > 0 && minParaFin <= 3 && minParaFin >= 0) grupoVence.push(ruta);
+        if (diffMin > 0 && minParaFin <= 5 && minParaFin >= 0) grupoVence.push(ruta);
         else if (diffMin > margen && !huboEscaneo(regsHoy, ruta)) grupoIncumplido.push(ruta);
     }
 
@@ -190,6 +190,33 @@ module.exports = async (req, res) => {
             await cursorRef.set({ lastMs: maxMs, actualizadoEn: new Date().toISOString() }, { merge: true });
         } else {
             await cursorRef.set({ lastMs: Date.now(), actualizadoEn: new Date().toISOString() }, { merge: true });
+        }
+
+        // 3) Limpieza de retención (una vez por día).
+        try {
+            const cursorData = cursorSnap.exists ? cursorSnap.data() : {};
+            const lastCleanup = cursorData.lastCleanup || 0;
+            if (Date.now() - lastCleanup > 24 * 60 * 60 * 1000) {
+                const corte = Date.now() - 60 * 24 * 60 * 60 * 1000;
+                let eliminados = 0;
+                for (let i = 0; i < 3; i++) {
+                    const oldSnap = await db.collection('registros_ronda')
+                        .where('timestampMs', '<', corte)
+                        .orderBy('timestampMs', 'asc')
+                        .limit(400)
+                        .get();
+                    if (oldSnap.empty) break;
+                    const batch = db.batch();
+                    oldSnap.forEach(d => batch.delete(d.ref));
+                    await batch.commit();
+                    eliminados += oldSnap.size;
+                    if (oldSnap.size < 400) break;
+                }
+                await cursorRef.set({ lastCleanup: Date.now() }, { merge: true });
+                if (eliminados > 0) console.log(`[Push] Limpieza: ${eliminados} registros antiguos eliminados.`);
+            }
+        } catch (e) {
+            console.warn('[Push] Error en limpieza:', e.message);
         }
 
         return res.status(200).json({

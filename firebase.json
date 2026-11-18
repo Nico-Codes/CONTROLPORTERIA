@@ -5,6 +5,18 @@
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
+    ],
+    "redirects": [
+      {
+        "source": "/",
+        "destination": "https://controlporteria.vercel.app/",
+        "type": 301
+      },
+      {
+        "source": "/index.html",
+        "destination": "https://controlporteria.vercel.app/",
+        "type": 301
+      }
     ]
   },
   "firestore": {

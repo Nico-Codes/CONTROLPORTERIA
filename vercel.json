@@ -1,10 +1,4 @@
 {
   "version": 2,
-  "outputDirectory": "dist",
-  "crons": [
-    {
-      "path": "/api/push",
-      "schedule": "* * * * *"
-    }
-  ]
+  "outputDirectory": "dist"
 }

@@ -2705,25 +2705,52 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 
 
-        window.abrirCalendarioEncargado = () => {
+        window.abrirCalendarioEncargado = async () => {
             const input = document.getElementById('input-fecha-calendario');
             if (!input) return;
             const hoy = obtenerFechaHoyISO();
             input.max = hoy;
             input.value = obtenerFechaFiltroISO();
+            // Limitar el minimo a la fecha mas antigua con registros (si se puede).
+            try {
+                const snap = await getDocs(query(collection(db, "registros_ronda"), orderBy("fechaISO", "asc"), limit(1)));
+                if (!snap.empty) {
+                    const oldest = snap.docs[0].data().fechaISO;
+                    if (oldest) input.min = oldest;
+                }
+            } catch (e) { /* ignorar */ }
             try { input.showPicker(); } catch (e) { input.click(); }
         };
 
+        let ultimaFechaCalendario = null;
         window.cambiarFechaCalendario = async (isoDate) => {
             if (!isoDate) return;
+            // Evitar procesar el mismo evento dos veces (algunos navegadores
+            // disparan 'change' al cerrar el selector con la fecha de hoy).
+            if (isoDate === ultimaFechaCalendario) return;
             const hoy = obtenerFechaHoyISO();
+            const fechaActualFiltro = obtenerFechaFiltroISO();
+            // Si el input se reseteo a hoy pero el filtro actual no es hoy,
+            // es un evento espurio del navegador: ignorarlo.
+            if (isoDate === hoy && fechaActualFiltro !== hoy) return;
             // No permitir fechas futuras.
             if (isoDate > hoy) isoDate = hoy;
             const dHoy = new Date(hoy + 'T00:00:00');
             const dSel = new Date(isoDate + 'T00:00:00');
             const diff = Math.round((dSel.getTime() - dHoy.getTime()) / (24 * 60 * 60 * 1000));
+            const offsetAnterior = offsetDiasFiltro;
             offsetDiasFiltro = Math.min(0, diff);
+            ultimaFechaCalendario = isoDate;
             actualizarRelojYFechaHeader();
             await cargarRegistrosAdmin();
+            // Si no hay registros para esa fecha, avisar y volver a la fecha anterior.
+            const hayRegistros = registrosAdminCache.some(r => r.fechaISO === isoDate);
+            if (!hayRegistros && isoDate !== hoy) {
+                mostrarAvisoPanel('No hay registros para ' + isoDate + '. Selecciona otra fecha.', 'warn');
+                offsetDiasFiltro = offsetAnterior;
+                ultimaFechaCalendario = obtenerFechaFiltroISO();
+                actualizarRelojYFechaHeader();
+                await cargarRegistrosAdmin();
+            }
             renderizarTodoAdmin();
         };

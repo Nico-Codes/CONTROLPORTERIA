@@ -38,7 +38,7 @@
 <body class="bg-[#F7F7F5] text-[#0F172A] min-h-screen flex flex-col antialiased selection:bg-[#0F172A] selection:text-white">
 
     <!-- Gate de permisos obligatorios -->
-    <div id="gate-permisos" class="fixed inset-0 z-[100] bg-[#F7F7F5] flex items-center justify-center p-4">
+    <div id="gate-permisos" class="fixed inset-0 z-40 bg-[#F7F7F5] flex items-center justify-center p-4">
         <div class="w-full max-w-[420px] bg-white rounded-2xl shadow-xl border border-[#E2E8F0] p-6 space-y-5">
             <div class="text-center space-y-1">
                 <div class="w-12 h-12 mx-auto rounded-xl bg-[#0F172A] text-white flex items-center justify-center text-xl overflow-hidden">
@@ -3043,20 +3043,21 @@
                 const diasTxt = diasArr.length === 0 ? "Sin agendar" : (diasArr.length >= 7 ? "L–D" : diasArr.join(', '));
 
                 let horariosChips = '';
-                if (rutasPt.length === 0) horariosChips = `<span class="text-[#64748B]">Ronda libre</span>`;
-                else rutasPt.forEach(rp => horariosChips += `<span class="inline-block px-1.5 py-0.5 rounded border border-[#E2E8F0] bg-[#F8FAFC] font-mono-val text-[11px] mr-1 mb-1">${escapeHtml(rp.hora)}</span>`);
+                rutasPt.forEach(rp => horariosChips += `<span class="inline-block px-1.5 py-0.5 rounded border border-[#E2E8F0] bg-[#F8FAFC] font-mono-val text-[11px]">${escapeHtml(rp.hora)}</span>`);
 
                 tbody.innerHTML += `
-                    <tr class="hover:bg-[#F8FAFC] transition">
-                        <td class="py-3.5 px-5">
+                    <tr class="hover:bg-[#F8FAFC] transition align-top">
+                        <td class="py-4 px-5">
                             <strong class="font-medium text-[#0F172A] block">${escapeHtml(p.nombre)}</strong>
                             <span class="text-[12px] text-[#94A3B8] font-mono-val">${escapeHtml(p.codigo)}</span>
                         </td>
-                        <td class="py-3.5 px-5 font-mono-val text-xs text-[#334155]">${escapeHtml(p.lat ?? 0)}, ${escapeHtml(p.lng ?? 0)}</td>
-                        <td class="py-3.5 px-5 font-mono-val text-xs text-[#334155]">${Number(p.tolerancia) || 25} m</td>
-                        <td class="py-3.5 px-5 text-xs text-[#334155]">${escapeHtml(diasTxt)}</td>
-                        <td class="py-3.5 px-5">${horariosChips}</td>
-                        <td class="py-3.5 px-5 text-right space-x-1">
+                        <td class="py-4 px-5 font-mono-val text-xs text-[#334155] whitespace-nowrap">${escapeHtml(p.lat ?? 0)}, ${escapeHtml(p.lng ?? 0)}</td>
+                        <td class="py-4 px-5 font-mono-val text-xs text-[#334155] whitespace-nowrap">${Number(p.tolerancia) || 25} m</td>
+                        <td class="py-4 px-5 text-xs text-[#334155] max-w-[140px] break-words">${escapeHtml(diasTxt)}</td>
+                        <td class="py-4 px-5 max-w-[220px]">
+                            <div class="flex flex-wrap gap-1">${horariosChips || '<span class="text-[#64748B]">Ronda libre</span>'}</div>
+                        </td>
+                        <td class="py-4 px-5 text-right space-x-1 whitespace-nowrap">
                             <button onclick="abrirModalQRPorId('${p.id}')" class="h-8 px-2.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 rounded text-xs font-semibold text-[#334155]"><i class="fa-solid fa-qrcode mr-1"></i> QR</button>
                             <button onclick="eliminarPunto('${p.id}')" class="h-8 px-2 bg-white border border-red-200 hover:bg-red-50 rounded text-xs text-red-600"><i class="fa-solid fa-trash"></i></button>
                         </td>

@@ -532,15 +532,15 @@
         
         <div id="aviso-panel" class="hidden rounded-lg border px-4 py-3 text-sm font-medium" role="status" aria-live="polite"></div>
 
-        <div class="flex justify-between items-center text-xs text-[#64748B]">
-            <div class="flex items-center gap-2">
-                <span>Panel supervisor</span>
-                <i class="fa-solid fa-chevron-right text-[10px]"></i>
-                <span id="breadcrumb-actual" class="font-medium text-[#0F172A]">Auditoría</span>
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs text-[#64748B]">
+            <div class="flex items-center gap-2 min-w-0">
+                <span class="whitespace-nowrap">Panel supervisor</span>
+                <i class="fa-solid fa-chevron-right text-[10px] shrink-0"></i>
+                <span id="breadcrumb-actual" class="font-medium text-[#0F172A] truncate">Auditoría</span>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 shrink-0">
                 <span id="indicador-red" class="w-1.5 h-1.5 rounded-full bg-[#10B981]"></span>
-                <span class="font-mono-val text-[11px]">Sincronización en tiempo real</span>
+                <span class="font-mono-val text-[11px] whitespace-nowrap">Sincronización en tiempo real</span>
             </div>
         </div>
 

@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "control-rondas-porteria-7ecc7",
     "public": "public",
     "ignore": [
       "firebase.json",

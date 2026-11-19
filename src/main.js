@@ -971,13 +971,13 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
             document.getElementById('modal-login-encargado').classList.remove('hidden');
             requestAnimationFrame(() => {
-                document.getElementById('sheet-login-encargado').classList.remove('translate-y-full');
+                document.getElementById('sheet-login-encargado').classList.remove('scale-95', 'opacity-0');
                 setTimeout(() => input.focus(), 260);
             });
         };
 
         window.cerrarModalLoginEncargado = () => {
-            document.getElementById('sheet-login-encargado').classList.add('translate-y-full');
+            document.getElementById('sheet-login-encargado').classList.add('scale-95', 'opacity-0');
             setTimeout(() => {
                 document.getElementById('modal-login-encargado').classList.add('hidden');
             }, 250);

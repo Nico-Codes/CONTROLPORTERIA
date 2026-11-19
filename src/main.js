@@ -2703,3 +2703,27 @@ document.addEventListener('DOMContentLoaded', () => {
         actualizarEstado();
     }, 300);
 })();
+
+
+        window.abrirCalendarioEncargado = () => {
+            const input = document.getElementById('input-fecha-calendario');
+            if (!input) return;
+            const hoy = obtenerFechaHoyISO();
+            input.max = hoy;
+            input.value = obtenerFechaFiltroISO();
+            try { input.showPicker(); } catch (e) { input.click(); }
+        };
+
+        window.cambiarFechaCalendario = async (isoDate) => {
+            if (!isoDate) return;
+            const hoy = obtenerFechaHoyISO();
+            // No permitir fechas futuras.
+            if (isoDate > hoy) isoDate = hoy;
+            const dHoy = new Date(hoy + 'T00:00:00');
+            const dSel = new Date(isoDate + 'T00:00:00');
+            const diff = Math.round((dSel.getTime() - dHoy.getTime()) / (24 * 60 * 60 * 1000));
+            offsetDiasFiltro = Math.min(0, diff);
+            actualizarRelojYFechaHeader();
+            await cargarRegistrosAdmin();
+            renderizarTodoAdmin();
+        };

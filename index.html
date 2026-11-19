@@ -532,6 +532,10 @@
                 <span id="header-fecha-larga" class="px-3 text-xs font-medium text-[#0F172A] capitalize min-w-[120px] text-center">Hoy, 17 nov 2026</span>
                 <button id="btn-fecha-sig" onclick="cambiarFechaFiltro(1)" class="w-8 h-8 rounded hover:bg-white text-[#334155] flex items-center justify-center transition shadow-xs shrink-0" aria-label="Día siguiente"><i class="fa-solid fa-chevron-right text-xs"></i></button>
             </div>
+            <button onclick="abrirCalendarioEncargado()" class="w-8 h-8 rounded-lg border border-[#E2E8F0] bg-white hover:bg-slate-50 text-[#334155] flex items-center justify-center transition shadow-xs shrink-0" aria-label="Abrir calendario" title="Seleccionar fecha">
+                <i class="fa-regular fa-calendar"></i>
+            </button>
+            <input type="date" id="input-fecha-calendario" class="sr-only" onchange="cambiarFechaCalendario(this.value)">
         </div>
 
         <div id="aviso-panel" class="hidden rounded-lg border px-4 py-3 text-sm font-medium" role="status" aria-live="polite"></div>

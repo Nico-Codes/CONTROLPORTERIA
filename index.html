@@ -483,11 +483,11 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-2 flex-wrap justify-end">
-                <div class="hidden sm:flex items-center gap-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg p-1">
-                    <button onclick="cambiarFechaFiltro(-1)" class="w-7 h-7 rounded hover:bg-white text-[#334155] flex items-center justify-center transition shadow-xs"><i class="fa-solid fa-chevron-left text-xs"></i></button>
-                    <span id="header-fecha-larga" class="px-3 text-xs font-medium text-[#0F172A] capitalize">Hoy, 17 nov 2026</span>
-                    <button id="btn-fecha-sig" onclick="cambiarFechaFiltro(1)" class="w-7 h-7 rounded hover:bg-white text-[#334155] flex items-center justify-center transition shadow-xs"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+            <div class="flex items-center gap-3 flex-wrap justify-end">
+                <div class="flex items-center gap-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg p-1 w-full sm:w-auto justify-center">
+                    <button onclick="cambiarFechaFiltro(-1)" class="w-7 h-7 rounded hover:bg-white text-[#334155] flex items-center justify-center transition shadow-xs shrink-0"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                    <span id="header-fecha-larga" class="px-2 sm:px-3 text-xs font-medium text-[#0F172A] capitalize truncate">Hoy, 17 nov 2026</span>
+                    <button id="btn-fecha-sig" onclick="cambiarFechaFiltro(1)" class="w-7 h-7 rounded hover:bg-white text-[#334155] flex items-center justify-center transition shadow-xs shrink-0"><i class="fa-solid fa-chevron-right text-xs"></i></button>
                 </div>
 
                 <button id="btn-notif-admin" onclick="solicitarPermisoNotificaciones('encargado')" title="Alertas de incidencias en este dispositivo" class="h-9 px-3 rounded-lg border border-[#E2E8F0] hover:bg-slate-50 text-[#334155] flex items-center gap-2 text-xs font-medium transition shadow-xs">

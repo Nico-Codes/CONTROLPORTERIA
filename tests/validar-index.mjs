@@ -3,15 +3,23 @@
  * Validación estática del HTML y JS del proyecto.
  * No necesita dependencias: se ejecuta con `node tests/validar-index.mjs`.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const archivoHtml = resolve(raiz, 'index.html');
-const archivoJs = resolve(raiz, 'src/main.js');
+const directorioSrc = resolve(raiz, 'src');
 const html = readFileSync(archivoHtml, 'utf8');
-const js = readFileSync(archivoJs, 'utf8');
+function listarArchivosJs(directorio) {
+  return readdirSync(directorio, { withFileTypes: true }).flatMap(entrada => {
+    const ruta = resolve(directorio, entrada.name);
+    if (entrada.isDirectory()) return listarArchivosJs(ruta);
+    return entrada.isFile() && entrada.name.endsWith('.js') ? [ruta] : [];
+  });
+}
+const archivosJs = listarArchivosJs(directorioSrc);
+const js = archivosJs.map(archivo => readFileSync(archivo, 'utf8')).join('\n');
 const codigo = html + '\n' + js;
 
 const errores = [];
@@ -50,7 +58,7 @@ if (dinamicos.length > 0) {
   advertencias.push(`IDs construidos dinámicamente (revisar a mano): ${dinamicos.join(', ')}`);
 }
 
-console.log(`Archivos: ${archivoHtml} + ${archivoJs}`);
+console.log(`Archivos: ${archivoHtml} + ${archivosJs.length} módulo(s) de src/`);
 console.log(`IDs definidos: ${idsUnicos.size}`);
 console.log(`Referencias getElementById(): ${new Set(referencias).size}`);
 console.log(`Handlers inline: ${new Set(handlers).size}`);

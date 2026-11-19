@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const { timingSafeEqual } = require('node:crypto');
 
 const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
@@ -126,6 +127,26 @@ async function enviarProactivos(db, messaging, tokens) {
 }
 
 module.exports = async (req, res) => {
+    if (req.method !== 'GET' && req.method !== 'POST') {
+        res.setHeader('Allow', 'GET, POST');
+        return res.status(405).json({ error: 'Método no permitido.' });
+    }
+
+    const secret = process.env.CRON_SECRET;
+    if (!secret) {
+        console.error('[Push] Falta la variable de entorno CRON_SECRET.');
+        return res.status(503).json({ error: 'Emisor no configurado.' });
+    }
+
+    const authorization = req.headers.authorization || '';
+    const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+    const esperado = Buffer.from(secret);
+    const recibido = Buffer.from(token);
+    const autorizado = esperado.length === recibido.length && timingSafeEqual(esperado, recibido);
+    if (!autorizado) {
+        return res.status(401).json({ error: 'No autorizado.' });
+    }
+
     try {
         initAdmin();
         const db = admin.firestore();

@@ -6,14 +6,21 @@
  *
  * Ejecutar con: node tests/validar-reglas.mjs
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(resolve(raiz, 'index.html'), 'utf8');
-const js = readFileSync(resolve(raiz, 'src/main.js'), 'utf8');
-const codigo = html + '\n' + js;
+function listarArchivosJs(directorio) {
+  return readdirSync(directorio, { withFileTypes: true }).flatMap(entrada => {
+    const ruta = resolve(directorio, entrada.name);
+    if (entrada.isDirectory()) return listarArchivosJs(ruta);
+    return entrada.isFile() && entrada.name.endsWith('.js') ? [ruta] : [];
+  });
+}
+const archivosJs = listarArchivosJs(resolve(raiz, 'src'));
+const codigo = html + '\n' + archivosJs.map(archivo => readFileSync(archivo, 'utf8')).join('\n');
 const reglas = readFileSync(resolve(raiz, 'firestore.rules'), 'utf8');
 
 const fallas = [];
@@ -41,7 +48,7 @@ comprobar('Los registros guardan tolerancia', contiene('tolerancia: tolerancia')
 comprobar('La cola offline reconstruye las fechas', contiene('itemFs.expiraEn = new Date(Number(itemFs.timestampMs) + RETENCION_MS)'));
 
 // Regla de escaneo por horario
-comprobar('Solo un registro OK completa una ruta', /function registroCorrespondeARuta\(reg, ruta\) \{\s*if \(!reg \|\| !ruta \|\| reg\.severidad !== "OK"\) return false;/.test(codigo));
+comprobar('Solo un registro OK completa una ruta', /function registroCorrespondeARuta\(reg, ruta\) \{\s*if \(!reg \|\| !ruta \|\| reg\.severidad !== ['"]OK['"]\) return false;/.test(codigo));
 comprobar('La agenda usa registroCorrespondeARuta', contiene('const regOk = regsHoy.find(reg => registroCorrespondeARuta(reg, r));'));
 comprobar('El escaneo prioriza la ruta pendiente más temprana', contiene('const pendientes = rutasPunto.filter(r => !rutaCompletada(regsHoy, r));'));
 

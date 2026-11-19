@@ -512,10 +512,14 @@
                     <i class="fa-solid fa-list-check"></i>
                     <span>Auditoría</span>
                 </button>
-                <button onclick="cambiarTabAdmin('rutas')" id="tab-rutas" class="pb-3 text-sm font-medium border-b-2 border-transparent text-[#64748B] hover:text-[#1E293B] flex items-center gap-2.5 whitespace-nowrap shrink-0 transition">
+                <button onclick="cambiarTabAdmin('puntos')" id="tab-puntos" class="pb-3 text-sm font-medium border-b-2 border-transparent text-[#64748B] hover:text-[#1E293B] flex items-center gap-2.5 whitespace-nowrap shrink-0 transition">
                     <i class="fa-solid fa-map-location-dot"></i>
-                    <span>Puntos y horarios</span>
+                    <span>Puntos de control</span>
                     <span id="badge-puntos-tab" class="px-1.5 py-0.5 rounded-full bg-[#E2E8F0] text-[#0F172A] text-[10px] font-mono-val font-bold">0</span>
+                </button>
+                <button onclick="cambiarTabAdmin('rutas')" id="tab-rutas" class="pb-3 text-sm font-medium border-b-2 border-transparent text-[#64748B] hover:text-[#1E293B] flex items-center gap-2.5 whitespace-nowrap shrink-0 transition">
+                    <i class="fa-solid fa-calendar-clock"></i>
+                    <span>Programación de horarios</span>
                 </button>
                 <button onclick="cambiarTabAdmin('personal')" id="tab-personal" class="pb-3 text-sm font-medium border-b-2 border-transparent text-[#64748B] hover:text-[#1E293B] flex items-center gap-2.5 whitespace-nowrap shrink-0 transition">
                     <i class="fa-solid fa-users"></i>
@@ -728,7 +732,7 @@
         </div>
 
         <!-- SECCIÓN 2: PUNTOS Y HORARIOS -->
-        <div id="seccion-rutas" class="hidden grid grid-cols-1 xl:grid-cols-12 gap-6">
+        <div id="seccion-puntos" class="hidden grid grid-cols-1 xl:grid-cols-12 gap-6">
             <div class="xl:col-span-8 space-y-6">
                 <div class="bg-white border border-[#E2E8F0] rounded-lg shadow-xs overflow-hidden">
                     <div class="p-5 border-b border-[#E2E8F0] flex justify-between items-center">
@@ -741,93 +745,63 @@
                             <span>Imprimir todos los QR</span>
                         </button>
                     </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse min-w-[760px]">
+                            <thead>
+                                <tr class="bg-[#F8FAFC]/60 border-b border-[#E2E8F0] text-[11px] font-bold text-[#64748B] uppercase tracking-[0.05em]">
+                                    <th class="py-3 px-5">Punto</th><th class="py-3 px-5">Coordenadas</th><th class="py-3 px-5">Radio</th><th class="py-3 px-5">Días</th><th class="py-3 px-5">Horarios</th><th class="py-3 px-5 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-puntos-admin-body" class="divide-y divide-[#F1F5F9] text-sm text-[#334155]"><tr><td colspan="6" class="py-8 text-center text-slate-400">Cargando puntos...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="xl:col-span-4">
+                <div class="bg-white border border-[#E2E8F0] rounded-lg p-5 shadow-xs space-y-4">
+                    <div><h2 class="text-base font-semibold text-[#0F172A]">Nuevo punto de control</h2><p class="text-xs text-[#64748B] mt-0.5">Registrá la ubicación exacta donde se pegará el QR.</p></div>
+                    <div class="space-y-3 pt-1">
+                        <div><label class="block text-xs font-medium text-[#334155] mb-1">Nombre del punto</label><input type="text" id="punto-nombre" placeholder="Ej. Portón 3" class="w-full h-10 bg-white border border-[#E2E8F0] rounded-md px-3 text-xs text-[#0F172A] focus:outline-none focus:ring-1 focus:ring-[#0F172A]"></div>
+                        <div class="grid grid-cols-2 gap-3"><div><label class="block text-xs font-medium text-[#334155] mb-1">Latitud</label><input type="number" step="any" id="punto-lat" placeholder="-32.851" class="w-full h-10 bg-white border border-[#E2E8F0] rounded-md px-3 text-xs font-mono-val text-[#0F172A]"></div><div><label class="block text-xs font-medium text-[#334155] mb-1">Longitud</label><input type="number" step="any" id="punto-lng" placeholder="-61.154" class="w-full h-10 bg-white border border-[#E2E8F0] rounded-md px-3 text-xs font-mono-val text-[#0F172A]"></div></div>
+                        <button onclick="crearPuntoConGPS()" class="w-full h-10 border border-dashed border-[#CBD5E1] hover:border-[#0F172A] hover:bg-slate-50 text-[#334155] rounded-md text-xs font-semibold flex items-center justify-center gap-2 transition"><i class="fa-solid fa-location-crosshairs text-[#0F172A]"></i><span id="btn-gps-txt">Crear punto con mi ubicación actual</span></button>
+                        <div class="space-y-1.5 pt-1"><div class="flex justify-between items-center text-xs"><label class="font-medium text-[#334155]">Radio permitido</label><span id="lbl-radio-val" class="font-mono-val font-semibold text-[#0F172A]">25 m</span></div><input type="range" id="punto-tolerancia" min="10" max="100" step="5" value="25" oninput="document.getElementById('lbl-radio-val').textContent = this.value + ' m'" class="w-full accent-[#0F172A] cursor-pointer"></div>
+                        <button onclick="guardarPuntoManual()" class="w-full h-10 bg-[#0F172A] hover:bg-[#1E293B] text-white rounded-md text-xs font-semibold flex items-center justify-center gap-2 transition shadow-xs mt-2"><i class="fa-solid fa-qrcode"></i><span>Crear punto y generar QR</span></button>
+                        <p id="msg-punto" class="hidden text-[11px] font-medium leading-snug" role="status" aria-live="polite"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN 3: PROGRAMACIÓN DE HORARIOS -->
+        <div id="seccion-rutas" class="hidden grid grid-cols-1 xl:grid-cols-12 gap-6">
+            <div class="xl:col-span-8 space-y-6">
+                <div class="bg-white border border-[#E2E8F0] rounded-lg shadow-xs overflow-hidden">
+                    <div class="p-5 border-b border-[#E2E8F0] flex justify-between items-center">
+                        <div>
+                            <h2 class="text-base font-semibold text-[#0F172A]">Horarios agendados por día</h2>
+                            <p class="text-xs text-[#64748B] mt-0.5">Revisá y administrá los puntos incluidos en cada programación.</p>
+                        </div>
+                        <select id="filtro-dia-rutas" onchange="renderizarRutasAdmin()" class="h-8 bg-white border border-[#E2E8F0] rounded-md px-3 text-xs font-medium text-[#334155]"><option value="TODOS">Todos los días</option><option value="Lunes">Lunes</option><option value="Martes">Martes</option><option value="Miércoles">Miércoles</option><option value="Jueves">Jueves</option><option value="Viernes">Viernes</option><option value="Sábado">Sábado</option><option value="Domingo">Domingo</option></select>
+                    </div>
 
                     <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse min-w-[760px]">
                             <thead>
                                 <tr class="bg-[#F8FAFC]/60 border-b border-[#E2E8F0] text-[11px] font-bold text-[#64748B] uppercase tracking-[0.05em]">
-                                    <th class="py-3 px-5">Punto</th>
-                                    <th class="py-3 px-5">Coordenadas</th>
-                                    <th class="py-3 px-5">Radio</th>
-                                    <th class="py-3 px-5">Días</th>
-                                    <th class="py-3 px-5">Horarios</th>
-                                    <th class="py-3 px-5 text-right">Acciones</th>
+                                    <th class="py-3 px-5">Día</th><th class="py-3 px-5">Hora</th><th class="py-3 px-5">Punto</th><th class="py-3 px-5">Tolerancia</th><th class="py-3 px-5 text-right">Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody id="tabla-puntos-admin-body" class="divide-y divide-[#F1F5F9] text-sm text-[#334155]">
-                                <tr><td colspan="6" class="py-8 text-center text-slate-400">Cargando puntos...</td></tr>
+                            <tbody id="tabla-rutas-admin-body" class="divide-y divide-[#F1F5F9] text-sm text-[#334155]">
+                                <tr><td colspan="5" class="py-8 text-center text-slate-400">Horarios programados...</td></tr>
                             </tbody>
                         </table>
                     </div>
+                    <div id="lista-rutas-admin" class="hidden"></div>
                 </div>
 
-                <div class="bg-white border border-[#E2E8F0] rounded-lg shadow-xs overflow-hidden">
-                    <div class="p-5 border-b border-[#E2E8F0] flex justify-between items-center">
-                        <h2 class="text-base font-semibold text-[#0F172A]">Horarios agendados por día</h2>
-                        <select id="filtro-dia-rutas" onchange="renderizarRutasAdmin()" class="h-8 bg-white border border-[#E2E8F0] rounded-md px-3 text-xs font-medium text-[#334155]">
-                            <option value="TODOS">Todos los días</option>
-                            <option value="Lunes">Lunes</option>
-                            <option value="Martes">Martes</option>
-                            <option value="Miércoles">Miércoles</option>
-                            <option value="Jueves">Jueves</option>
-                            <option value="Viernes">Viernes</option>
-                            <option value="Sábado">Sábado</option>
-                            <option value="Domingo">Domingo</option>
-                        </select>
-                    </div>
-                    <div class="p-5">
-                        <div id="lista-rutas-admin" class="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                            <p class="text-xs text-slate-400">Sin horarios programados.</p>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <div class="xl:col-span-4 space-y-6">
-                <div class="bg-white border border-[#E2E8F0] rounded-lg p-5 shadow-xs space-y-4">
-                    <div>
-                        <h2 class="text-base font-semibold text-[#0F172A]">Nuevo punto de control</h2>
-                        <p class="text-xs text-[#64748B] mt-0.5">Registrá la ubicación exacta donde se pegará el QR.</p>
-                    </div>
-
-                    <div class="space-y-3 pt-1">
-                        <div>
-                            <label class="block text-xs font-medium text-[#334155] mb-1">Nombre del punto</label>
-                            <input type="text" id="punto-nombre" placeholder="Ej. Portón 3" class="w-full h-10 bg-white border border-[#E2E8F0] rounded-md px-3 text-xs text-[#0F172A] focus:outline-none focus:ring-1 focus:ring-[#0F172A]">
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-medium text-[#334155] mb-1">Latitud</label>
-                                <input type="number" step="any" id="punto-lat" placeholder="-32.851" class="w-full h-10 bg-white border border-[#E2E8F0] rounded-md px-3 text-xs font-mono-val text-[#0F172A]">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-[#334155] mb-1">Longitud</label>
-                                <input type="number" step="any" id="punto-lng" placeholder="-61.154" class="w-full h-10 bg-white border border-[#E2E8F0] rounded-md px-3 text-xs font-mono-val text-[#0F172A]">
-                            </div>
-                        </div>
-
-                        <button onclick="crearPuntoConGPS()" class="w-full h-10 border border-dashed border-[#CBD5E1] hover:border-[#0F172A] hover:bg-slate-50 text-[#334155] rounded-md text-xs font-semibold flex items-center justify-center gap-2 transition">
-                            <i class="fa-solid fa-location-crosshairs text-[#0F172A]"></i>
-                            <span id="btn-gps-txt">Crear punto con mi ubicación actual</span>
-                        </button>
-
-                        <div class="space-y-1.5 pt-1">
-                            <div class="flex justify-between items-center text-xs">
-                                <label class="font-medium text-[#334155]">Radio permitido</label>
-                                <span id="lbl-radio-val" class="font-mono-val font-semibold text-[#0F172A]">25 m</span>
-                            </div>
-                            <input type="range" id="punto-tolerancia" min="10" max="100" step="5" value="25" oninput="document.getElementById('lbl-radio-val').textContent = this.value + ' m'" class="w-full accent-[#0F172A] cursor-pointer">
-                        </div>
-
-                        <button onclick="guardarPuntoManual()" class="w-full h-10 bg-[#0F172A] hover:bg-[#1E293B] text-white rounded-md text-xs font-semibold flex items-center justify-center gap-2 transition shadow-xs mt-2">
-                            <i class="fa-solid fa-qrcode"></i>
-                            <span>Crear punto y generar QR</span>
-                        </button>
-                        <p id="msg-punto" class="hidden text-[11px] font-medium leading-snug" role="status" aria-live="polite"></p>
-                    </div>
-                </div>
-
                 <div class="bg-white border border-[#E2E8F0] rounded-lg p-5 shadow-xs space-y-4">
                     <div>
                         <h2 class="text-base font-semibold text-[#0F172A]">Programar horario</h2>
@@ -836,13 +810,11 @@
 
                     <div class="space-y-3 pt-1">
                         <div>
-                            <label class="block text-xs font-medium text-[#334155] mb-1">Punto de control</label>
-                            <select id="ruta-punto" class="hidden" aria-hidden="true" tabindex="-1">
-                                <option value="">-- Seleccioná un punto --</option>
-                            </select>
+                            <label class="block text-xs font-medium text-[#334155] mb-1">Puntos de control</label>
+                            <input type="hidden" id="ruta-punto" value="">
                             <button type="button" onclick="abrirModalMapaRuta()" class="w-full min-h-10 px-3 py-2 bg-white border border-[#CBD5E1] hover:border-[#0F172A] rounded-md text-left transition flex items-center justify-between gap-3">
-                                <span id="ruta-punto-seleccionado" class="text-xs text-[#64748B]">Elegí un punto en el mapa</span>
-                                <span class="text-xs font-semibold text-[#0F172A] shrink-0"><i class="fa-solid fa-map-location-dot mr-1"></i>Ver mapa</span>
+                                <span id="ruta-punto-seleccionado" class="text-xs text-[#64748B]">Elegí puntos en el mapa</span>
+                                <span class="text-xs font-semibold text-[#0F172A] shrink-0"><i class="fa-solid fa-map-location-dot mr-1"></i>Elegir puntos</span>
                             </button>
                         </div>
 
@@ -877,7 +849,7 @@
 
                         <button onclick="agregarHorarioRuta()" class="w-full h-10 border border-[#0F172A] text-[#0F172A] hover:bg-[#0F172A] hover:text-white rounded-md text-xs font-semibold flex items-center justify-center gap-2 transition mt-2">
                             <i class="fa-solid fa-plus"></i>
-                            <span>Agregar horario</span>
+                            <span>Programar puntos seleccionados</span>
                         </button>
                         <p id="msg-ruta" class="hidden text-[11px] font-medium leading-snug" role="status" aria-live="polite"></p>
                     </div>
@@ -885,7 +857,7 @@
             </div>
         </div>
 
-        <!-- SECCIÓN 3: PERSONAL -->
+        <!-- SECCIÓN 4: PERSONAL -->
         <div id="seccion-personal" class="hidden grid grid-cols-1 xl:grid-cols-12 gap-6">
             <div class="xl:col-span-8 space-y-6">
                 <div class="bg-white border border-[#E2E8F0] rounded-lg shadow-xs overflow-hidden">
@@ -1048,8 +1020,8 @@
         <div class="bg-white w-full max-w-5xl max-h-[94vh] rounded-xl shadow-2xl border border-[#E2E8F0] flex flex-col overflow-hidden">
             <div class="flex items-start justify-between gap-4 px-4 sm:px-6 py-4 border-b border-[#E2E8F0]">
                 <div>
-                    <h2 id="modal-mapa-ruta-titulo" class="font-semibold text-[#0F172A]">Seleccionar punto de control</h2>
-                    <p class="text-xs text-[#64748B] mt-1">Elegí un marcador del mapa o un punto de la lista.</p>
+                    <h2 id="modal-mapa-ruta-titulo" class="font-semibold text-[#0F172A]">Seleccionar puntos de control</h2>
+                    <p class="text-xs text-[#64748B] mt-1">Marcá varios puntos en el mapa o en la lista para programarlos juntos.</p>
                 </div>
                 <button type="button" onclick="cerrarModalMapaRuta()" class="w-9 h-9 rounded-lg hover:bg-slate-100 text-[#64748B]" aria-label="Cerrar mapa"><i class="fa-solid fa-xmark"></i></button>
             </div>
@@ -1065,10 +1037,10 @@
                     </aside>
                 </div>
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4">
-                    <p id="mapa-punto-elegido" class="text-xs text-[#64748B]" aria-live="polite">Todavía no seleccionaste un punto.</p>
+                        <p id="mapa-punto-elegido" class="text-xs text-[#64748B]" aria-live="polite">Todavía no seleccionaste puntos.</p>
                     <div class="flex gap-2 sm:justify-end">
                         <button type="button" onclick="cerrarModalMapaRuta()" class="h-10 px-4 border border-[#CBD5E1] rounded-md text-xs font-semibold text-[#334155] hover:bg-slate-50">Cancelar</button>
-                        <button id="btn-confirmar-punto-mapa" type="button" onclick="confirmarPuntoMapaRuta()" disabled class="h-10 px-4 bg-[#0F172A] text-white rounded-md text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed">Usar este punto</button>
+                        <button id="btn-confirmar-punto-mapa" type="button" onclick="confirmarPuntoMapaRuta()" disabled class="h-10 px-4 bg-[#0F172A] text-white rounded-md text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed">Usar puntos seleccionados</button>
                     </div>
                 </div>
             </div>

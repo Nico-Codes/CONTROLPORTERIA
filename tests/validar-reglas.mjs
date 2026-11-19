@@ -70,6 +70,9 @@ comprobar('Editar un punto solo modifica su nombre', contiene('updateDoc(doc(db,
 comprobar('Editar el punto conserva su código QR y evita nombres duplicados', contiene('existePuntoConNombre(nombre, punto.codigo)'));
 comprobar('Los horarios asociados reciben el nuevo nombre', contiene('lote.update(ruta.ref, { puntoNombre: nombre })'));
 comprobar('La programación permite elegir puntos desde el mapa', contiene('window.abrirModalMapaRuta'));
+comprobar('El panel separa puntos y programación en pestañas propias', contiene("cambiarTabAdmin('puntos')") && contiene('id="seccion-puntos"') && contiene("cambiarTabAdmin('rutas')") && contiene('id="seccion-rutas"'));
+comprobar('El mapa permite seleccionar varios puntos simultáneamente', contiene('let codigosMapaRutaPendientes = new Set()') && contiene('codigosMapaRutaPendientes.add(codigo)'));
+comprobar('La programación crea cada combinación de punto y día', contiene('codigosQR.forEach(codigoQR => {') && contiene('diasSeleccionadosForm.forEach(dia => {') && contiene('batch.set(ref, { dia, codigoQR, puntoNombre, hora, margen })'));
 comprobar('El modal llama al renderizador existente del mapa', contiene('actualizarPuntosMapaRuta();') && !contiene('renderizarListaPuntosMapaRuta()'));
 comprobar('El mapa posiciona los puntos con sus coordenadas', contiene('window.L.marker([lat, lng]'));
 comprobar('El mapa muestra atribución de OpenStreetMap', contiene('tile.openstreetmap.org') && contiene('openstreetmap.org/copyright'));

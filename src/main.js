@@ -57,7 +57,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         let escaneoEnProceso = false;
         let mapaPuntosRutas = null;
         let capaPuntosRutas = null;
-        let codigoMapaRutaPendiente = "";
+        let codigosMapaRutaPendientes = new Set();
 
         function generarCodigoPuntoUnico() {
             let codigo;
@@ -1379,7 +1379,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         }
 
         window.cambiarTabAdmin = (tab) => {
-            ['auditoria', 'rutas', 'personal'].forEach(t => {
+            ['auditoria', 'puntos', 'rutas', 'personal'].forEach(t => {
                 const sec = document.getElementById(`seccion-${t}`);
                 const btn = document.getElementById(`tab-${t}`);
                 if (t === tab) {
@@ -1390,7 +1390,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                     btn.className = "pb-3 text-sm font-medium border-b-2 border-transparent text-[#64748B] hover:text-[#1E293B] flex items-center gap-2.5 whitespace-nowrap transition";
                 }
             });
-            const nombresTab = { auditoria: "Auditoría", rutas: "Puntos y horarios", personal: "Personal" };
+            const nombresTab = { auditoria: "Auditoría", puntos: "Puntos de control", rutas: "Programación de horarios", personal: "Personal" };
             document.getElementById('breadcrumb-actual').textContent = nombresTab[tab];
         };
 
@@ -1464,19 +1464,18 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
                 const selectRuta = document.getElementById('ruta-punto');
                 if (selectRuta) {
-                    const codigoSeleccionado = selectRuta.value;
-                    selectRuta.innerHTML = '<option value="">-- Seleccioná un punto --</option>';
-                    pts.forEach(p => {
-                        const opt = document.createElement('option');
-                        opt.value = p.codigo;
-                        opt.textContent = `${p.nombre} (${p.codigo})`;
-                        selectRuta.appendChild(opt);
-                    });
-                    if (puntosCache[codigoSeleccionado]) {
-                        selectRuta.value = codigoSeleccionado;
+                    const codigosSeleccionados = selectRuta.value.split(',').filter(Boolean);
+                    const seleccionValida = codigosSeleccionados.filter(codigo => puntosCache[codigo]);
+                    if (seleccionValida.length > 0) {
+                        selectRuta.value = seleccionValida.join(',');
                         const elegido = document.getElementById('ruta-punto-seleccionado');
-                        elegido.textContent = `${puntosCache[codigoSeleccionado].nombre} (${codigoSeleccionado})`;
+                        elegido.textContent = `${seleccionValida.length} punto(s): ${seleccionValida.map(codigo => puntosCache[codigo].nombre).join(', ')}`;
                         elegido.className = 'text-xs font-semibold text-[#0F172A]';
+                    } else {
+                        selectRuta.value = '';
+                        const elegido = document.getElementById('ruta-punto-seleccionado');
+                        elegido.textContent = 'Elegí puntos en el mapa';
+                        elegido.className = 'text-xs text-[#64748B]';
                     }
                 }
                 actualizarPuntosMapaRuta();
@@ -1929,12 +1928,12 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
         window.abrirModalMapaRuta = () => {
             const modal = document.getElementById('modal-mapa-ruta');
-            const select = document.getElementById('ruta-punto');
             if (Object.keys(puntosCache).length === 0) {
                 return mostrarMensajeForm('msg-ruta', 'Primero creá al menos un punto de control.', 'error');
             }
 
-            codigoMapaRutaPendiente = select.value || '';
+            const seleccionActual = document.getElementById('ruta-punto').value;
+            codigosMapaRutaPendientes = new Set(seleccionActual ? seleccionActual.split(',').filter(Boolean) : []);
             modal.classList.remove('hidden');
             actualizarPuntosMapaRuta();
             if (!window.L) {
@@ -1972,21 +1971,21 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         });
 
         window.confirmarPuntoMapaRuta = () => {
-            const punto = puntosCache[codigoMapaRutaPendiente];
-            if (!punto) return;
-            document.getElementById('ruta-punto').value = punto.codigo;
+            const puntos = [...codigosMapaRutaPendientes].map(codigo => puntosCache[codigo]).filter(Boolean);
+            if (puntos.length === 0) return;
+            document.getElementById('ruta-punto').value = puntos.map(punto => punto.codigo).join(',');
             const elegido = document.getElementById('ruta-punto-seleccionado');
-            elegido.textContent = `${punto.nombre} (${punto.codigo})`;
+            elegido.textContent = `${puntos.length} punto(s): ${puntos.map(punto => punto.nombre).join(', ')}`;
             elegido.className = 'text-xs font-semibold text-[#0F172A]';
             cerrarModalMapaRuta();
         };
 
         function seleccionarPuntoMapaRuta(codigo) {
-            codigoMapaRutaPendiente = codigo;
+            if (codigosMapaRutaPendientes.has(codigo)) codigosMapaRutaPendientes.delete(codigo);
+            else codigosMapaRutaPendientes.add(codigo);
             actualizarSeleccionMapaRuta();
             const marcador = capaPuntosRutas && capaPuntosRutas.getLayers().find(m => m.options.codigoPunto === codigo);
             if (marcador) {
-                mapaPuntosRutas.setView(marcador.getLatLng(), Math.max(mapaPuntosRutas.getZoom(), 16));
                 marcador.openPopup();
             }
         }
@@ -2023,6 +2022,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 const tieneCoordenadas = coordenadasValidasPunto(p);
                 const boton = document.createElement('button');
                 boton.type = 'button';
+                boton.dataset.codigo = p.codigo;
                 boton.className = 'w-full text-left px-2.5 py-2 rounded-md border border-[#E2E8F0] hover:border-[#0F172A] hover:bg-slate-50 text-xs transition';
                 boton.textContent = `${p.nombre || 'Punto'} (${p.codigo})${tieneCoordenadas ? '' : ' · sin coordenadas'}`;
                 boton.disabled = !tieneCoordenadas;
@@ -2047,7 +2047,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 const marcador = window.L.marker([lat, lng], {
                     title: `${p.nombre || 'Punto'} (${p.codigo})`,
                     alt: `Punto ${p.nombre || p.codigo}`,
-                    icon: iconoPuntoMapaRuta(p.codigo === codigoMapaRutaPendiente)
+                    icon: iconoPuntoMapaRuta(codigosMapaRutaPendientes.has(p.codigo))
                 });
                 marcador.options.codigoPunto = p.codigo;
                 marcador.bindPopup(contenido);
@@ -2069,16 +2069,16 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         }
 
         function actualizarSeleccionMapaRuta() {
-            const punto = puntosCache[codigoMapaRutaPendiente];
+            const puntos = [...codigosMapaRutaPendientes].map(codigo => puntosCache[codigo]).filter(Boolean);
             const etiqueta = document.getElementById('mapa-punto-elegido');
             const confirmar = document.getElementById('btn-confirmar-punto-mapa');
-            if (etiqueta) etiqueta.textContent = punto ? `Seleccionado: ${punto.nombre} (${punto.codigo})` : 'Todavía no seleccionaste un punto.';
-            if (confirmar) confirmar.disabled = !coordenadasValidasPunto(punto);
+            if (etiqueta) etiqueta.textContent = puntos.length ? `Seleccionados (${puntos.length}): ${puntos.map(punto => punto.nombre).join(', ')}` : 'Todavía no seleccionaste puntos.';
+            if (confirmar) confirmar.disabled = puntos.length === 0;
 
             const lista = document.getElementById('lista-puntos-mapa');
             if (lista) {
                 Array.from(lista.children).forEach(boton => {
-                    const seleccionado = punto && boton.textContent.startsWith(`${punto.nombre} (${punto.codigo})`);
+                    const seleccionado = codigosMapaRutaPendientes.has(boton.dataset.codigo);
                     boton.classList.toggle('border-emerald-600', Boolean(seleccionado));
                     boton.classList.toggle('bg-emerald-50', Boolean(seleccionado));
                 });
@@ -2086,7 +2086,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
             if (capaPuntosRutas) {
                 capaPuntosRutas.eachLayer(marcador => {
-                    marcador.setIcon(iconoPuntoMapaRuta(marcador.options.codigoPunto === codigoMapaRutaPendiente));
+                    marcador.setIcon(iconoPuntoMapaRuta(codigosMapaRutaPendientes.has(marcador.options.codigoPunto)));
                 });
             }
         }
@@ -2096,9 +2096,12 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 if (mapaPuntosRutas) mapaPuntosRutas.setView([-32.851, -61.154], 13);
                 return;
             }
-            const seleccionado = capaPuntosRutas.getLayers().find(m => m.options.codigoPunto === codigoMapaRutaPendiente);
-            if (seleccionado) {
-                mapaPuntosRutas.setView(seleccionado.getLatLng(), Math.max(mapaPuntosRutas.getZoom(), 15));
+            const seleccionados = capaPuntosRutas.getLayers().filter(m => codigosMapaRutaPendientes.has(m.options.codigoPunto));
+            if (seleccionados.length === 1) {
+                mapaPuntosRutas.setView(seleccionados[0].getLatLng(), Math.max(mapaPuntosRutas.getZoom(), 15));
+            } else if (seleccionados.length > 1) {
+                const grupo = window.L.featureGroup(seleccionados);
+                mapaPuntosRutas.fitBounds(grupo.getBounds(), { padding: [24, 24], maxZoom: 16 });
             } else {
                 mapaPuntosRutas.fitBounds(capaPuntosRutas.getBounds(), { padding: [24, 24], maxZoom: 16 });
             }
@@ -2106,6 +2109,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
         function renderizarPuntosAdmin() {
             const tbody = document.getElementById('tabla-puntos-admin-body');
+            if (!tbody) return;
             tbody.innerHTML = '';
             const codigos = Object.keys(puntosCache);
             if (codigos.length === 0) {
@@ -2144,28 +2148,19 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         }
 
         window.renderizarRutasAdmin = () => {
-            const contenedor = document.getElementById('lista-rutas-admin');
+            const contenedor = document.getElementById('tabla-rutas-admin-body');
             const filtro = document.getElementById('filtro-dia-rutas').value;
+            if (!contenedor) return;
             contenedor.innerHTML = '';
 
             const rutasFiltradas = rutasCache.filter(r => filtro === "TODOS" || r.dia === filtro || r.dia === "Todos");
             if (rutasFiltradas.length === 0) {
-                contenedor.innerHTML = '<p class="text-xs text-slate-400">Sin horarios agendados para este filtro.</p>';
+                contenedor.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-400">Sin horarios agendados para este filtro.</td></tr>';
                 return;
             }
 
             rutasFiltradas.forEach(r => {
-                contenedor.innerHTML += `
-                    <div class="flex justify-between items-center bg-[#F8FAFC] border border-[#E2E8F0] p-3 rounded-md text-xs">
-                        <div>
-                            <span class="font-bold uppercase px-2 py-0.5 rounded bg-slate-200 text-[#0F172A] text-[10px] mr-2">${escapeHtml(r.dia)}</span>
-                            <strong class="font-mono-val text-sm text-[#0F172A] mr-2">${escapeHtml(r.hora)}</strong>
-                            <span class="text-[#334155] font-medium">${escapeHtml(r.puntoNombre || 'Punto')}</span>
-                            <span class="text-[11px] text-[#64748B] ml-2">(±${Number(r.margen) || 15} min)</span>
-                        </div>
-                        <button onclick="eliminarRuta('${r.id}')" class="text-red-500 hover:text-red-700 font-semibold px-2 py-1"><i class="fa-solid fa-trash"></i></button>
-                    </div>
-                `;
+                contenedor.innerHTML += `<tr class="border-b border-[#F1F5F9] text-sm"><td class="py-3 px-5">${escapeHtml(r.dia)}</td><td class="py-3 px-5 font-mono-val">${escapeHtml(r.hora)}</td><td class="py-3 px-5">${escapeHtml(r.puntoNombre || 'Punto')}</td><td class="py-3 px-5">±${Number(r.margen) || 15} min</td><td class="py-3 px-5 text-right"><button onclick="eliminarRuta('${r.id}')" class="text-red-500 hover:text-red-700 font-semibold px-2 py-1" aria-label="Eliminar horario"><i class="fa-solid fa-trash"></i></button></td></tr>`;
             });
         };
 
@@ -2242,33 +2237,40 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         };
 
         window.agregarHorarioRuta = async () => {
-            const codigoQR = document.getElementById('ruta-punto').value;
+            const codigosQR = document.getElementById('ruta-punto').value.split(',').filter(Boolean);
             const hora = document.getElementById('ruta-hora').value;
             const margen = parseInt(document.getElementById('ruta-margen').value) || 15;
-            if (!codigoQR || !hora || diasSeleccionadosForm.length === 0) return mostrarMensajeForm('msg-ruta', "Seleccioná punto, días y hora.", 'error');
+            if (codigosQR.length === 0 || !hora || diasSeleccionadosForm.length === 0) return mostrarMensajeForm('msg-ruta', "Seleccioná puntos, días y hora.", 'error');
             if (margen < 1 || margen > 120) return mostrarMensajeForm('msg-ruta', "El margen debe estar entre 1 y 120 minutos.", 'error');
 
-            const p = puntosCache[codigoQR];
-            const puntoNombre = p ? p.nombre : codigoQR;
-
-            const repetidos = diasSeleccionadosForm.filter(dia =>
-                rutasCache.some(r => r.codigoQR === codigoQR && r.dia === dia && String(r.hora || '') === String(hora))
-            );
-            if (repetidos.length > 0) {
-                return mostrarMensajeForm('msg-ruta', `Ya existe un horario ${hora} para ${puntoNombre} en: ${repetidos.join(', ')}.`, 'error');
+            const conflictos = [];
+            codigosQR.forEach(codigoQR => {
+                const punto = puntosCache[codigoQR];
+                diasSeleccionadosForm.forEach(dia => {
+                    if (rutasCache.some(r => r.codigoQR === codigoQR && r.dia === dia && String(r.hora || '') === String(hora))) {
+                        conflictos.push(`${punto ? punto.nombre : codigoQR} (${dia})`);
+                    }
+                });
+            });
+            if (conflictos.length > 0) {
+                return mostrarMensajeForm('msg-ruta', `Ya existe un horario ${hora} para: ${conflictos.join(', ')}.`, 'error');
             }
 
             try {
                 const batch = writeBatch(db);
-                for (const dia of diasSeleccionadosForm) {
-                    const ref = doc(collection(db, "rutas_horarias"));
-                    batch.set(ref, { dia, codigoQR, puntoNombre, hora, margen });
-                }
+                codigosQR.forEach(codigoQR => {
+                    const punto = puntosCache[codigoQR];
+                    const puntoNombre = punto ? punto.nombre : codigoQR;
+                    diasSeleccionadosForm.forEach(dia => {
+                        const ref = doc(collection(db, "rutas_horarias"));
+                        batch.set(ref, { dia, codigoQR, puntoNombre, hora, margen });
+                    });
+                });
                 await batch.commit();
                 await cargarRutas();
                 renderizarRutasAdmin();
                 renderizarPuntosAdmin();
-                mostrarMensajeForm('msg-ruta', `Se programó ${puntoNombre} a las ${hora} en ${diasSeleccionadosForm.length} día(s).`, 'ok');
+                mostrarMensajeForm('msg-ruta', `Se programaron ${codigosQR.length} punto(s) a las ${hora} en ${diasSeleccionadosForm.length} día(s).`, 'ok');
             } catch (e) {
                 console.error('[Rutas] Error al agendar horario:', e);
                 mostrarMensajeForm('msg-ruta', "No se pudo agendar el horario. Revisá la conexión y las reglas de Firestore.", 'error');

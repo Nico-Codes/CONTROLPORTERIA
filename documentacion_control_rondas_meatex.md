@@ -49,7 +49,7 @@ tests/                        Validadores y pruebas unitarias
 
 ### Encargado
 
-La sesión de la interfaz se guarda en `sessionStorage`. El panel tiene las secciones Auditoría, Puntos y horarios, y Personal. Permite filtrar registros, administrar rutas y operadores, activar/desactivar operadores, generar QR, consultar métricas y exportar XLSX.
+La sesión de la interfaz se guarda en `sessionStorage`. El panel tiene las secciones Auditoría, Puntos de control, Programación de horarios y Personal. Permite filtrar registros, administrar rutas y operadores, activar/desactivar operadores, generar QR, consultar métricas y exportar XLSX.
 
 La contraseña `admin123` está en código cliente. Es una barrera visual de la interfaz, no un mecanismo de autenticación seguro.
 
@@ -81,7 +81,7 @@ Los nuevos registros incluyen `timestampMs`, `fechaISO`, `rutaId`, `diaRuta`, `m
 
 ## 6. Panel y exportación
 
-El encargado puede cambiar el nombre de un punto sin alterar su código QR. Los horarios asociados reciben el nombre actualizado; los registros históricos conservan el nombre guardado al momento del escaneo. Al programar un horario, el punto se selecciona en un mapa Leaflet con cartografía de OpenStreetMap; requiere Internet y muestra su atribución.
+El encargado puede cambiar el nombre de un punto sin alterar su código QR. Los horarios asociados reciben el nombre actualizado; los registros históricos conservan el nombre guardado al momento del escaneo. En la pestaña Programación de horarios se pueden seleccionar varios puntos desde el mapa Leaflet con cartografía de OpenStreetMap y asignarles en conjunto los mismos días, hora y margen. Se crea una programación independiente por cada combinación de punto y día. El mapa requiere Internet y muestra su atribución.
 
 El panel consulta registros del día seleccionado con un máximo configurado de 2.000 por carga. Los filtros incluyen operador, severidad/estado y texto de búsqueda. Los KPI se calculan con los registros disponibles en el cache del día seleccionado.
 

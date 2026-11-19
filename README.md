@@ -12,7 +12,7 @@ PWA estática para registrar y auditar rondas de vigilancia mediante códigos QR
 - `firestore.rules`: reglas versionadas de Firestore.
 - `api/push.js`: endpoint de push para Vercel; requiere `CRON_SECRET` y `FIREBASE_SERVICE_ACCOUNT`.
 - `push-sender/`: emisor alternativo ejecutable manualmente desde GitHub Actions; usa el secreto `FIREBASE_SERVICE_ACCOUNT`.
-- El encargado puede cambiar el nombre de un punto sin alterar su código QR y elegir puntos para los horarios desde un mapa Leaflet con OpenStreetMap.
+- El encargado puede cambiar el nombre de un punto sin alterar su código QR. Las pestañas separan Puntos de control y Programación de horarios; en esta última se pueden seleccionar varios puntos en el mapa y asignarles los mismos días, hora y tolerancia.
 - `tests/`: validadores estáticos/contractuales y pruebas unitarias Vitest.
 
 ## Desarrollo
@@ -42,7 +42,7 @@ Colecciones principales: `operadores`, `puntos_control`, `rutas_horarias`, `regi
 - Cada horario requiere su propio registro `OK`; advertencias y críticos no completan la ruta.
 - Severidades: `OK`, `ADVERTENCIA` (fuera de horario) y `CRITICO` (GPS fuera de tolerancia o punto no programado). Los QR desconocidos se muestran como críticos y no se guardan.
 - Máximo 20 puntos y 30 operadores.
-- Los nombres de los puntos se pueden editar; el código QR es inmutable. La selección de puntos para horarios muestra las ubicaciones registradas en un mapa online.
+- Los nombres de los puntos se pueden editar; el código QR es inmutable. La programación permite seleccionar varias ubicaciones en un mapa online y crear sus horarios para los días elegidos.
 - La retención prevista es de 60 días. La app borra como máximo 2.000 registros antiguos por carga; el emisor alternativo también ejecuta una limpieza diaria acotada.
 - La exportación XLSX admite hasta 10.000 registros.
 

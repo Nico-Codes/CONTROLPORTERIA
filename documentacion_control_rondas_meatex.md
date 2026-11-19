@@ -70,7 +70,7 @@ La distancia GPS se calcula con Haversine. El radio predeterminado es 25 m cuand
 
 | Colección | Uso y campos relevantes |
 |---|---|
-| `puntos_control` | Punto de control: nombre, código QR, latitud, longitud y tolerancia. |
+| `puntos_control` | Punto de control: nombre editable, código QR estable, latitud, longitud y tolerancia. |
 | `rutas_horarias` | Día, código QR, nombre del punto, hora objetivo y margen en minutos. |
 | `operadores` | Nombre, legajo, turno y estado activo. |
 | `registros_ronda` | Operador, QR/punto, fecha/hora, coordenadas, distancia, tolerancia, ruta aplicada, margen, estado, severidad y fechas de creación/expiración. |
@@ -80,6 +80,8 @@ La distancia GPS se calcula con Haversine. El radio predeterminado es 25 m cuand
 Los nuevos registros incluyen `timestampMs`, `fechaISO`, `rutaId`, `diaRuta`, `margen`, `tolerancia`, `creadoEn` y `expiraEn`. El historial conserva el margen y la tolerancia aplicados cuando se produjo el escaneo.
 
 ## 6. Panel y exportación
+
+El encargado puede cambiar el nombre de un punto sin alterar su código QR. Los horarios asociados reciben el nombre actualizado; los registros históricos conservan el nombre guardado al momento del escaneo. Al programar un horario, el punto se selecciona en un mapa Leaflet con cartografía de OpenStreetMap; requiere Internet y muestra su atribución.
 
 El panel consulta registros del día seleccionado con un máximo configurado de 2.000 por carga. Los filtros incluyen operador, severidad/estado y texto de búsqueda. Los KPI se calculan con los registros disponibles en el cache del día seleccionado.
 

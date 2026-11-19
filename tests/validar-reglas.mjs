@@ -66,6 +66,12 @@ comprobar('Eliminar operador pide confirmación', contiene('if (!confirm(`¿Elim
 comprobar('Eliminar punto pide confirmación', contiene('if (!confirm(aviso)) return;'));
 comprobar('Eliminar punto borra sus rutas en lote', contiene('rutasAsociadas.forEach(r => batch.delete(doc(db, "rutas_horarias", r.id)));'));
 comprobar('No se permiten nombres de punto duplicados', contiene('if (existePuntoConNombre(nombre))'));
+comprobar('Editar un punto solo modifica su nombre', contiene('updateDoc(doc(db, "puntos_control", id), { nombre });'));
+comprobar('Editar el punto conserva su código QR y evita nombres duplicados', contiene('existePuntoConNombre(nombre, punto.codigo)'));
+comprobar('Los horarios asociados reciben el nuevo nombre', contiene('lote.update(ruta.ref, { puntoNombre: nombre })'));
+comprobar('La programación permite elegir puntos desde el mapa', contiene('window.abrirModalMapaRuta'));
+comprobar('El mapa posiciona los puntos con sus coordenadas', contiene('window.L.marker([lat, lng]'));
+comprobar('El mapa muestra atribución de OpenStreetMap', contiene('tile.openstreetmap.org') && contiene('openstreetmap.org/copyright'));
 comprobar('No se permiten operadores duplicados', contiene('operadoresCache.some(op => String(op.nombre || \'\').trim().toLowerCase() === nombre.toLowerCase())'));
 
 // Exportación

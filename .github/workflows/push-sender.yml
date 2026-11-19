@@ -1,9 +1,6 @@
 name: Push sender gratuito
 
 on:
-  schedule:
-    # Cada 5 minutos; GitHub Actions puede demorar 1-2 min en ejecutar.
-    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:

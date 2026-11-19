@@ -107,8 +107,8 @@ Los emisores ejecutan dos grupos de trabajo: alertas proactivas de rutas próxim
 
 ### Emisores disponibles
 
-- **GitHub Actions:** `.github/workflows/push-sender.yml` ejecuta `push-sender/` con cron cada cinco minutos y permite ejecución manual. Requiere el secreto de repositorio `FIREBASE_SERVICE_ACCOUNT`.
-- **Vercel Function:** `api/push.js` es una alternativa. Requiere `FIREBASE_SERVICE_ACCOUNT` y `CRON_SECRET` en el entorno de Vercel. Acepta `GET` (método de Vercel Cron) y `POST`; ambos requieren `Authorization: Bearer <CRON_SECRET>`. El `vercel.json` versionado no declara una programación `crons`; la configuración del proyecto debe apuntar a `/api/push`.
+- **cron-job.org → Vercel Function:** cron-job.org llama `GET https://controlporteria.vercel.app/api/push` según su programación. Debe enviar `Authorization: Bearer <CRON_SECRET>`. Vercel requiere las variables `FIREBASE_SERVICE_ACCOUNT` y `CRON_SECRET`.
+- **GitHub Actions:** `.github/workflows/push-sender.yml` permite ejecución manual de `push-sender/` como alternativa; no tiene cron automático para evitar dos emisores simultáneos.
 
 No se deben ejecutar ambos emisores simultáneamente sin evaluar duplicados y cooldowns compartidos.
 

@@ -11,7 +11,7 @@ PWA estática para registrar y auditar rondas de vigilancia mediante códigos QR
 - `public/`: manifest, iconos, Service Worker FCM y 404.
 - `firestore.rules`: reglas versionadas de Firestore.
 - `api/push.js`: endpoint de push para Vercel; requiere `CRON_SECRET` y `FIREBASE_SERVICE_ACCOUNT`.
-- `push-sender/`: emisor alternativo ejecutado por GitHub Actions cada cinco minutos; usa el secreto `FIREBASE_SERVICE_ACCOUNT`.
+- `push-sender/`: emisor alternativo ejecutable manualmente desde GitHub Actions; usa el secreto `FIREBASE_SERVICE_ACCOUNT`.
 - `tests/`: validadores estáticos/contractuales y pruebas unitarias Vitest.
 
 ## Desarrollo
@@ -30,7 +30,7 @@ npm test          # validadores y pruebas unitarias
 
 - **Vercel** sirve el build de Vite desde `dist/` y publica `api/push.js` como función serverless.
 - **Firebase Hosting** redirige `/` y `/index.html` al dominio de Vercel. Las reglas se despliegan con `firebase deploy --only firestore:rules`.
-- El workflow `.github/workflows/push-sender.yml` se ejecuta con cron cada cinco minutos (GitHub puede retrasar la ejecución). También permite ejecución manual.
+- El workflow `.github/workflows/push-sender.yml` permite ejecución manual. La programación de producción se realiza en cron-job.org llamando a `/api/push`.
 
 ## Datos y reglas de negocio
 
@@ -54,8 +54,9 @@ Para registrar tokens FCM se debe configurar una clave pública VAPID en `VAPID_
 
 Hay dos emisores alternativos:
 
-1. GitHub Actions ejecuta `push-sender/` cada cinco minutos y requiere el secreto de repositorio `FIREBASE_SERVICE_ACCOUNT`.
-2. La función `api/push.js` requiere las variables de entorno `FIREBASE_SERVICE_ACCOUNT` y `CRON_SECRET`. Acepta `GET` (método usado por Vercel Cron) y `POST`; ambos requieren `Authorization: Bearer <CRON_SECRET>`. No hay una programación `crons` declarada en el `vercel.json` versionado; la configuración externa del proyecto debe apuntar a `/api/push`.
+1. cron-job.org invoca `GET https://controlporteria.vercel.app/api/push` según el intervalo configurado. Debe enviar `Authorization: Bearer <CRON_SECRET>`.
+2. La función `api/push.js` requiere las variables de entorno `FIREBASE_SERVICE_ACCOUNT` y `CRON_SECRET` en Vercel. También acepta `POST`, pero ambos métodos requieren el encabezado de autorización.
+3. GitHub Actions conserva una ejecución manual alternativa; su workflow no tiene programación automática para evitar dos emisores simultáneos.
 
 ## Seguridad y limitaciones
 

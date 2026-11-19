@@ -1936,7 +1936,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
             codigoMapaRutaPendiente = select.value || '';
             modal.classList.remove('hidden');
-            renderizarListaPuntosMapaRuta();
+            actualizarPuntosMapaRuta();
             if (!window.L) {
                 document.getElementById('mapa-puntos-aviso').textContent = 'No se pudo cargar el mapa. Podés elegir el punto desde la lista.';
                 document.getElementById('mapa-puntos-aviso').classList.remove('hidden');

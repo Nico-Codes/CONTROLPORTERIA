@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, addDoc, setDoc, getDocs, deleteDoc, updateDoc, doc, query, where, orderBy, limit, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, setDoc, getDocs, getDoc, deleteDoc, updateDoc, doc, query, where, orderBy, limit, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { getMessaging, getToken, onMessage, isSupported as isMessagingSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { calcularDistanciaMetros, estaDentroDeRadio } from "./utils/geo.js";
 import { obtenerIniciales, formatearHora24, formatearDeltaMinutos, escapeHtml, obtenerFechaHoyISO } from "./utils/format.js";
 import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMargenRegistro, obtenerToleranciaRegistro } from "./domain/rondas.js";
@@ -16,7 +17,6 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
         const DIAS_SEMANA = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
         const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-        const PASSWORD_ENCARGADO = "admin123";
 
         // Límites operativos y de retención
         const MAX_OPERADORES = 30;
@@ -31,6 +31,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        const auth = getAuth(app);
 
         let swRegistration = null;
         let fcmMessaging = null;
@@ -123,26 +124,65 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
             actualizarInterfazSegunRol();
             
-            await Promise.all([
-                cargarOperadores(),
-                cargarPuntos(),
-                cargarRutas(),
-                cargarRegistrosHoy()
-            ]);
-            await sincronizarColaOffline();
-            // Limpieza silenciosa de registros con más de 60 días.
-            limpiarRegistrosAntiguos();
-
-            if (sessionStorage.getItem('sesion_encargado') === 'activa') {
-                await cargarDatosPanelAdmin();
-                renderizarTodoAdmin();
-            }
-
             document.getElementById('op-skeleton').classList.add('hidden');
             document.getElementById('op-contenido').classList.remove('hidden');
 
             refrescarVistaOperador();
             iniciarMotorAlertasOperador();
+
+            // Listener de autenticación de Firebase. Restaura la sesión al cargar
+            // la página y reacciona a cambios (login/logout).
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    try {
+                        const perfilSnap = await getDoc(doc(db, 'usuarios', user.uid));
+                        const perfil = perfilSnap.exists() ? perfilSnap.data() : null;
+                        if (!perfil || perfil.activo === false) {
+                            await signOut(auth);
+                            sessionStorage.removeItem('sesion_encargado');
+                            actualizarInterfazSegunRol();
+                            return;
+                        }
+                        const rol = perfil.rol || 'operador';
+                        if (rol === 'superadmin' || rol === 'gerente') {
+                            sessionStorage.setItem('sesion_encargado', 'activa');
+                        } else {
+                            sessionStorage.removeItem('sesion_encargado');
+                        }
+                        sessionStorage.setItem('usuario_uid', user.uid);
+                        sessionStorage.setItem('usuario_rol', rol);
+                        sessionStorage.setItem('usuario_nombre', perfil.nombre || user.email.split('@')[0]);
+                        sessionStorage.setItem('usuario_plantas', JSON.stringify(perfil.plantas || []));
+                        actualizarInterfazSegunRol();
+                        // Cargar datos de la app (catálogos + registros).
+                        await Promise.all([
+                            cargarOperadores(),
+                            cargarPuntos(),
+                            cargarRutas(),
+                            cargarRegistrosHoy()
+                        ]);
+                        await sincronizarColaOffline();
+                        limpiarRegistrosAntiguos();
+                        if (perfil.rol === 'superadmin' || perfil.rol === 'gerente') {
+                            await cargarDatosPanelAdmin();
+                            renderizarTodoAdmin();
+                        }
+                        refrescarVistaOperador();
+                    } catch (e) {
+                        console.error('[Auth] Error al cargar perfil:', e);
+                    }
+                } else {
+                    sessionStorage.removeItem('sesion_encargado');
+                    sessionStorage.removeItem('usuario_uid');
+                    sessionStorage.removeItem('usuario_rol');
+                    sessionStorage.removeItem('usuario_nombre');
+                    sessionStorage.removeItem('usuario_plantas');
+                    actualizarInterfazSegunRol();
+                    // Mostrar el modal de login si no hay sesión.
+                    const modalLogin = document.getElementById('modal-login-encargado');
+                    if (modalLogin) modalLogin.classList.remove('hidden');
+                }
+            });
         });
 
         function refrescarVistaOperador() {
@@ -984,6 +1024,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         };
 
         window.cerrarModalLoginEncargado = () => {
+            if (!sessionStorage.getItem('usuario_uid')) return;
             document.getElementById('sheet-login-encargado').classList.add('scale-95', 'opacity-0');
             setTimeout(() => {
                 document.getElementById('modal-login-encargado').classList.add('hidden');
@@ -1002,33 +1043,63 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             }
         };
 
-        window.intentarLoginEncargado = async (e) => {
+        window.intentarLogin = async (e) => {
             e.preventDefault();
-            const input = document.getElementById('input-password-encargado');
+            const inputUsuario = document.getElementById('input-usuario-encargado');
+            const inputClave = document.getElementById('input-password-encargado');
             const err = document.getElementById('error-login-encargado');
 
-            if (input.value === PASSWORD_ENCARGADO) {
+            const usuario = (inputUsuario.value || '').trim().toLowerCase();
+            const clave = inputClave.value;
+            if (!usuario || !clave) {
+                err.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const email = usuario + '@rondas.meatex';
+                const cred = await signInWithEmailAndPassword(auth, email, clave);
+                const uid = cred.user.uid;
+
+                const perfilSnap = await getDoc(doc(db, 'usuarios', uid));
+                const perfil = perfilSnap.exists() ? perfilSnap.data() : null;
+                if (!perfil || perfil.activo === false) {
+                    await signOut(auth);
+                    err.classList.remove('hidden');
+                    return;
+                }
+
                 sessionStorage.setItem('sesion_encargado', 'activa');
+                sessionStorage.setItem('usuario_uid', uid);
+                sessionStorage.setItem('usuario_rol', perfil.rol || 'operador');
+                sessionStorage.setItem('usuario_nombre', perfil.nombre || usuario);
+                sessionStorage.setItem('usuario_plantas', JSON.stringify(perfil.plantas || []));
+
                 cerrarModalLoginEncargado();
                 actualizarInterfazSegunRol();
                 actualizarEstadoVisualNotificaciones();
                 iniciarListenerIncidenciasSupervisor();
                 if ("Notification" in window && Notification.permission === "granted") {
-                    registrarTokenFCM('encargado');
+                    registrarTokenFCM(perfil.rol === 'operador' ? 'operador' : 'encargado');
                 }
-                // Cargar todos los datos frescos antes de renderizar el panel
                 await cargarDatosPanelAdmin();
                 renderizarTodoAdmin();
-            } else {
-                input.classList.add('border-[#DC2626]', 'animar-sacudida');
+            } catch (error) {
+                console.error('[Auth] Error al iniciar sesión:', error);
+                inputClave.classList.add('border-[#DC2626]', 'animar-sacudida');
                 err.classList.remove('hidden');
-                setTimeout(() => input.classList.remove('animar-sacudida'), 300);
+                setTimeout(() => inputClave.classList.remove('animar-sacudida'), 300);
             }
         };
 
-        window.cerrarSesionEncargado = () => {
+        window.cerrarSesionEncargado = async () => {
             detenerListenerIncidenciasSupervisor();
+            try { await signOut(auth); } catch (e) { console.warn('[Auth] Error al cerrar sesión:', e); }
             sessionStorage.removeItem('sesion_encargado');
+            sessionStorage.removeItem('usuario_uid');
+            sessionStorage.removeItem('usuario_rol');
+            sessionStorage.removeItem('usuario_nombre');
+            sessionStorage.removeItem('usuario_plantas');
             actualizarInterfazSegunRol();
             actualizarEstadoVisualNotificaciones();
             if ("Notification" in window && Notification.permission === "granted") {

@@ -442,24 +442,28 @@
 
             <div class="px-6 py-4 border-b border-[#E2E8F0] flex justify-between items-center">
                 <div>
-                    <h3 class="text-[18px] font-semibold text-[#0F172A]">Acceso del encargado</h3>
-                    <p class="text-[13px] text-[#64748B]">Ingresá la clave de supervisión.</p>
+                    <h3 class="text-[18px] font-semibold text-[#0F172A]">Iniciar sesión</h3>
+                    <p class="text-[13px] text-[#64748B]">Ingresá tu usuario y contraseña.</p>
                 </div>
                 <button onclick="cerrarModalLoginEncargado()" aria-label="Cerrar" class="w-9 h-9 rounded-lg hover:bg-slate-100 text-[#64748B] flex items-center justify-center transition">
                     <i class="fa-solid fa-xmark text-base"></i>
                 </button>
             </div>
 
-            <form onsubmit="intentarLoginEncargado(event)" class="p-6 space-y-4">
+            <form onsubmit="intentarLogin(event)" class="p-6 space-y-4">
                 <div class="space-y-1.5">
-                    <label class="block text-[13px] font-medium text-[#334155]">Clave de acceso</label>
+                    <label class="block text-[13px] font-medium text-[#334155]">Usuario</label>
+                    <input type="text" id="input-usuario-encargado" placeholder="tu.usuario" autocomplete="username" class="w-full h-[48px] bg-white border border-[#E2E8F0] rounded-[10px] px-4 text-[16px] font-mono-val text-[#0F172A] focus:outline-none focus:ring-1 focus:ring-[#0F172A]">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="block text-[13px] font-medium text-[#334155]">Contraseña</label>
                     <div class="relative">
-                        <input type="password" id="input-password-encargado" placeholder="••••••••" class="w-full h-[48px] bg-white border border-[#E2E8F0] rounded-[10px] px-4 pr-12 text-[16px] font-mono-val text-[#0F172A] focus:outline-none focus:ring-1 focus:ring-[#0F172A]">
-                        <button type="button" onclick="toggleVerClaveEncargado()" aria-label="Ver clave" class="absolute right-0 top-0 h-full px-4 text-[#64748B] hover:text-[#0F172A] flex items-center justify-center transition">
+                        <input type="password" id="input-password-encargado" placeholder="••••••••" autocomplete="current-password" class="w-full h-[48px] bg-white border border-[#E2E8F0] rounded-[10px] px-4 pr-12 text-[16px] font-mono-val text-[#0F172A] focus:outline-none focus:ring-1 focus:ring-[#0F172A]">
+                        <button type="button" onclick="toggleVerClaveEncargado()" aria-label="Ver contraseña" class="absolute right-0 top-0 h-full px-4 text-[#64748B] hover:text-[#0F172A] flex items-center justify-center transition">
                             <i id="icono-ojo-clave" class="fa-regular fa-eye text-sm"></i>
                         </button>
                     </div>
-                    <p id="error-login-encargado" class="hidden text-[12px] text-[#DC2626] font-medium pt-1">Clave incorrecta</p>
+                    <p id="error-login-encargado" class="hidden text-[12px] text-[#DC2626] font-medium pt-1">Usuario o contraseña incorrectos</p>
                 </div>
 
                 <button type="submit" class="w-full h-[56px] rounded-[10px] bg-[#0F172A] hover:bg-[#1E293B] active:scale-[0.98] text-white font-semibold text-[16px] transition shadow-sm mt-2">

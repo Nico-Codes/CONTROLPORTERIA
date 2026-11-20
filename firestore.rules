@@ -2,34 +2,50 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Usuarios del sistema (perfiles y roles). Solo lectura para el propio usuario;
+    // escritura solo desde el backend (Admin SDK), no desde el cliente.
+    match /usuarios/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
     // Catálogos administrados desde el panel del encargado.
     match /operadores/{doc} {
-      allow read, write: if true;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
     }
 
     match /puntos_control/{doc} {
-      allow read, write: if true;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
     }
 
     match /rutas_horarias/{doc} {
-      allow read, write: if true;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
     }
 
     // Registros de auditoría: se crean desde la app y se eliminan en lotes los
     // registros con más de 60 días. No se permite modificar un registro existente.
     match /registros_ronda/{doc} {
-      allow read, create, delete: if true;
+      allow read, create, delete: if request.auth != null;
       allow update: if false;
     }
 
     // Tokens de dispositivos para notificaciones push.
     match /dispositivos_notificaciones/{doc} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null;
     }
 
     // Cursor del emisor de push (último timestamp procesado).
     match /config/{doc} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null;
+    }
+
+    // Plantas (multi-planta). Solo lectura para usuarios autenticados.
+    match /plantas/{plantaId} {
+      allow read: if request.auth != null;
+      allow write: if false;
     }
   }
 }

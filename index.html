@@ -1059,6 +1059,10 @@
                     <h2 id="modal-mapa-puntos-titulo" class="font-semibold text-[#0F172A]">Mapa de puntos de control</h2>
                     <p class="text-xs text-[#64748B] mt-1">Visualizá la ubicación de cada punto y editá su nombre o coordenadas desde el popup.</p>
                 </div>
+                <button type="button" onclick="alternarMiUbicacion()" id="btn-mi-ubicacion" class="h-9 px-3.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 text-[#334155] rounded-md text-xs font-semibold flex items-center gap-2 transition shadow-xs">
+                    <i class="fa-solid fa-location-crosshairs"></i>
+                    <span>Mi ubicación</span>
+                </button>
                 <button type="button" onclick="cerrarModalMapaPuntos()" class="w-9 h-9 rounded-lg hover:bg-slate-100 text-[#64748B]" aria-label="Cerrar mapa"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-4 sm:p-6 overflow-y-auto">

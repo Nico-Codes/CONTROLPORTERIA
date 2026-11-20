@@ -60,6 +60,8 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         let codigosMapaRutaPendientes = new Set();
         let mapaPuntos = null;
         let capaPuntos = null;
+        let marcadorMiUbicacion = null;
+        let watchUbicacion = null;
 
         function generarCodigoPuntoUnico() {
             let codigo;
@@ -2047,6 +2049,19 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         };
 
         window.cerrarModalMapaPuntos = () => {
+            if (watchUbicacion) {
+                navigator.geolocation.clearWatch(watchUbicacion);
+                watchUbicacion = null;
+            }
+            if (marcadorMiUbicacion && mapaPuntos) {
+                mapaPuntos.removeLayer(marcadorMiUbicacion);
+                marcadorMiUbicacion = null;
+            }
+            const btn = document.getElementById('btn-mi-ubicacion');
+            if (btn) {
+                btn.classList.remove('bg-[#0F172A]', 'text-white');
+                btn.classList.add('bg-white', 'text-[#334155]');
+            }
             const modal = document.getElementById('modal-mapa-puntos');
             if (modal) modal.classList.add('hidden');
         };
@@ -2059,6 +2074,74 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 iconAnchor: [11, 23]
             });
         }
+
+        window.recalibrarPunto = async (id) => {
+            const p = Object.values(puntosCache).find(x => x.id === id);
+            if (!p) return mostrarAvisoPanel('No se encontró el punto de control.', 'error');
+            if (!navigator.geolocation) return mostrarAvisoPanel('Este dispositivo no soporta geolocalización.', 'error');
+            mostrarAvisoPanel(`Obteniendo ubicación para recalibrar "${p.nombre}"…`, 'warn');
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                const precision = Math.round(pos.coords.accuracy);
+                if (!confirm(`¿Recalibrar "${p.nombre}" a tu ubicación actual?\nLat: ${lat.toFixed(6)}  Lng: ${lng.toFixed(6)}  (±${precision} m)`)) return;
+                try {
+                    await updateDoc(doc(db, 'puntos_control', id), { lat, lng });
+                    await cargarPuntos();
+                    renderizarPuntosAdmin();
+                    if (mapaPuntos) actualizarMapaPuntos();
+                    mostrarAvisoPanel(`"${p.nombre}" recalibrado a tu ubicación (±${precision} m).`, 'ok');
+                } catch (e) {
+                    console.error('[Puntos] Error al recalibrar:', e);
+                    mostrarAvisoPanel('No se pudo recalibrar el punto. Revisá la conexión y las reglas de Firestore.', 'error');
+                }
+            }, (err) => {
+                mostrarAvisoPanel('No se pudo obtener la ubicación. Habilitá el permiso de ubicación.', 'error');
+            }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+        };
+
+        window.alternarMiUbicacion = () => {
+            if (!mapaPuntos || !window.L) return;
+            const btn = document.getElementById('btn-mi-ubicacion');
+            if (watchUbicacion) {
+                navigator.geolocation.clearWatch(watchUbicacion);
+                watchUbicacion = null;
+                if (marcadorMiUbicacion && capaPuntos) {
+                    capaPuntos.removeLayer(marcadorMiUbicacion);
+                    marcadorMiUbicacion = null;
+                }
+                if (btn) btn.classList.remove('bg-[#0F172A]', 'text-white');
+                if (btn) btn.classList.add('bg-white', 'text-[#334155]');
+                return;
+            }
+            if (!navigator.geolocation) {
+                mostrarAvisoPanel('Este dispositivo no soporta geolocalización.', 'error');
+                return;
+            }
+            watchUbicacion = navigator.geolocation.watchPosition((pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                if (!marcadorMiUbicacion) {
+                    const icono = window.L.divIcon({
+                        className: 'marcador-mi-ubicacion',
+                        html: '<span class="marcador-mi-ubicacion-punto"></span>',
+                        iconSize: [18, 18],
+                        iconAnchor: [9, 9]
+                    });
+                    marcadorMiUbicacion = window.L.marker([lat, lng], { icon: icono, zIndexOffset: 1000 }).addTo(mapaPuntos);
+                } else {
+                    marcadorMiUbicacion.setLatLng([lat, lng]);
+                }
+                mapaPuntos.setView([lat, lng], Math.max(mapaPuntos.getZoom(), 16));
+            }, (err) => {
+                mostrarAvisoPanel('No se pudo obtener la ubicación. Habilitá el permiso.', 'error');
+                watchUbicacion = null;
+            }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+            if (btn) {
+                btn.classList.remove('bg-white', 'text-[#334155]');
+                btn.classList.add('bg-[#0F172A]', 'text-white');
+            }
+        };
 
         window.editarUbicacionPunto = async (id) => {
             const p = Object.values(puntosCache).find(x => x.id === id);
@@ -2141,6 +2224,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 }
                 acciones.append(
                     botonAccion('Editar nombre', 'border-[#E2E8F0] bg-white hover:bg-slate-50 text-[#334155]', () => editarNombrePunto(p.id)),
+                    botonAccion('Recalibrar aquí', 'border-[#0F172A] bg-[#0F172A] text-white hover:bg-[#1E293B]', () => recalibrarPunto(p.id)),
                     botonAccion('Editar ubicación', 'border-[#E2E8F0] bg-white hover:bg-slate-50 text-[#334155]', () => editarUbicacionPunto(p.id)),
                     botonAccion('QR', 'border-[#E2E8F0] bg-white hover:bg-slate-50 text-[#334155]', () => abrirModalQRPorId(p.id)),
                     botonAccion('Eliminar', 'border-red-200 bg-white hover:bg-red-50 text-red-600', () => eliminarPunto(p.id))

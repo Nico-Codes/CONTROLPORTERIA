@@ -3293,10 +3293,15 @@ document.addEventListener('DOMContentLoaded', () => {
         btnContinuar.addEventListener('click', () => {
             if (notifOk && gpsOk && installOk) {
                 gate.classList.add('hidden');
-                // Mostrar el login si no hay sesión activa.
-                if (!sessionStorage.getItem('usuario_uid')) {
-                    const modalLogin = document.getElementById('modal-login-encargado');
-                    if (modalLogin) modalLogin.classList.remove('hidden');
+                // Mostrar el login siempre después de pasar el gate.
+                const modalLogin = document.getElementById('modal-login-encargado');
+                if (modalLogin) {
+                    modalLogin.classList.remove('hidden');
+                    const sheet = document.getElementById('sheet-login-encargado');
+                    if (sheet) {
+                        sheet.classList.remove('scale-95', 'opacity-0');
+                        sheet.classList.add('scale-100', 'opacity-100');
+                    }
                 }
             }
         });

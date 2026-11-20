@@ -2415,10 +2415,10 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                             <strong class="font-medium text-[#0F172A] block">${escapeHtml(p.nombre)}</strong>
                             <span class="text-[12px] text-[#94A3B8] font-mono-val">${escapeHtml(p.codigo)}</span>
                         </td>
-                        <td class="py-3.5 px-5 font-mono-val text-xs text-[#334155]">${escapeHtml(p.lat ?? 0)}, ${escapeHtml(p.lng ?? 0)}</td>
+                        <td class="py-3.5 px-5 font-mono-val text-xs text-[#334155] hidden sm:table-cell">${escapeHtml(p.lat ?? 0)}, ${escapeHtml(p.lng ?? 0)}</td>
                         <td class="py-3.5 px-5 font-mono-val text-xs text-[#334155]">${Number(p.tolerancia) || 25} m</td>
-                        <td class="py-3.5 px-5 text-xs text-[#334155]">${escapeHtml(diasTxt)}</td>
-                        <td class="py-3.5 px-5">${horariosChips}</td>
+                        <td class="py-3.5 px-5 text-xs text-[#334155] hidden sm:table-cell">${escapeHtml(diasTxt)}</td>
+                        <td class="py-3.5 px-5 hidden sm:table-cell">${horariosChips}</td>
                         <td class="py-3.5 px-5 text-right space-x-1">
                             <button onclick="abrirModalQRPorId('${p.id}')" class="h-8 px-2.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 rounded text-xs font-semibold text-[#334155]"><i class="fa-solid fa-qrcode mr-1"></i> QR</button>
                             <button onclick="editarNombrePunto('${p.id}')" title="Editar nombre del punto" class="h-8 px-2 bg-white border border-[#E2E8F0] hover:bg-slate-50 rounded text-xs text-[#334155]"><i class="fa-solid fa-pen"></i></button>

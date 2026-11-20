@@ -40,6 +40,9 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         let swRegistration = null;
         let fcmMessaging = null;
         let unsubscribeIncidenciasSupervisor = null;
+        let suscripcionesCatalogos = [];
+        let catalogosListos = false;
+        let inicializacionAuthId = 0;
         let fcmTokenActual = localStorage.getItem('fcm_token_guardado') || null;
 
         let operadorActivo = localStorage.getItem('operador_seleccionado') || "";
@@ -101,7 +104,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             modal.classList.remove('hidden');
             modal.style.display = 'flex';
             const btnCerrar = document.getElementById('btn-cerrar-login');
-            if (btnCerrar) btnCerrar.style.display = sessionStorage.getItem('usuario_uid') ? 'flex' : 'none';
+            if (btnCerrar) btnCerrar.style.display = sessionStorage.getItem('usuario_uid') && catalogosListos ? 'flex' : 'none';
         }
 
         function mostrarMensajeForm(id, texto, tipo = "ok") {
@@ -122,6 +125,126 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             return formatearHora24(new Date(ms));
         }
 
+        function mostrarAvisoCatalogoOperador(texto = '') {
+            const aviso = document.getElementById('aviso-catalogo-operador');
+            if (!aviso) return;
+            aviso.textContent = texto;
+            aviso.classList.toggle('hidden', !texto);
+        }
+
+        function detenerSuscripcionesCatalogos() {
+            suscripcionesCatalogos.forEach(desuscribir => desuscribir());
+            suscripcionesCatalogos = [];
+            catalogosListos = false;
+        }
+
+        function aplicarOperadoresSnapshot(snapshot) {
+            operadoresCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            const filtro = document.getElementById('filtro-operador');
+            if (filtro) {
+                const valorAnterior = filtro.value;
+                filtro.replaceChildren(new Option('Todos los operadores', ''));
+                operadoresCache.forEach(op => filtro.appendChild(new Option(op.nombre, op.nombre)));
+                filtro.value = valorAnterior;
+            }
+            const activos = operadoresCache.filter(op => op.activo !== false);
+            const total = document.getElementById('lbl-total-operadores');
+            const badge = document.getElementById('badge-personal-tab');
+            if (total) total.textContent = `${operadoresCache.length} de ${MAX_OPERADORES} · ${activos.length} activos`;
+            if (badge) badge.textContent = operadoresCache.length;
+            if (operadorActivo && !activos.some(op => op.nombre === operadorActivo)) {
+                operadorActivo = '';
+                operadorPreseleccionadoSheet = '';
+                localStorage.removeItem('operador_seleccionado');
+            }
+            if (!document.getElementById('sheet-operador-overlay')?.classList.contains('hidden')) {
+                renderizarListaOperadoresSheet();
+                actualizarBotonConfirmarOperador();
+            }
+            if (sessionStorage.getItem('sesion_encargado') === 'activa') renderizarPersonalAdmin();
+            refrescarVistaOperador();
+        }
+
+        function aplicarPuntosSnapshot(snapshot) {
+            puntosCache = Object.fromEntries(snapshot.docs.map(d => [d.data().codigo, { id: d.id, ...d.data() }]));
+            const total = document.getElementById('lbl-total-puntos-activos');
+            const badge = document.getElementById('badge-puntos-tab');
+            if (total) total.textContent = `${snapshot.size} de ${MAX_PUNTOS}`;
+            if (badge) badge.textContent = snapshot.size;
+            const codigos = document.getElementById('ruta-punto')?.value.split(',').filter(Boolean) || [];
+            const seleccionados = codigos.filter(codigo => puntosCache[codigo]);
+            const etiqueta = document.getElementById('ruta-punto-seleccionado');
+            if (etiqueta && codigos.length) {
+                etiqueta.textContent = seleccionados.length
+                    ? `${seleccionados.length} punto(s): ${seleccionados.map(codigo => puntosCache[codigo].nombre).join(', ')}`
+                    : 'Elegí puntos en el mapa';
+            }
+            actualizarPuntosMapaRuta();
+            if (sessionStorage.getItem('sesion_encargado') === 'activa') renderizarPuntosAdmin();
+            if (!document.getElementById('modal-mapa-puntos')?.classList.contains('hidden')) actualizarMapaPuntos();
+            refrescarVistaOperador();
+        }
+
+        function aplicarRutasSnapshot(snapshot) {
+            rutasCache = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            if (sessionStorage.getItem('sesion_encargado') === 'activa') {
+                renderizarRutasAdmin();
+                renderizarPuntosAdmin();
+            }
+            refrescarVistaOperador();
+        }
+
+        function iniciarSuscripcionesCatalogos(plantaId) {
+            detenerSuscripcionesCatalogos();
+            puntosCache = {};
+            rutasCache = [];
+            operadoresCache = [];
+            const pendientes = new Set(['operadores', 'puntos_control', 'rutas_horarias']);
+
+            return new Promise((resolve, reject) => {
+                let finalizada = false;
+                const temporizador = setTimeout(() => {
+                    fallar(new Error('No se pudieron sincronizar los puntos y horarios con el servidor. Revisá la conexión y recargá.'));
+                }, 15000);
+
+                function fallar(error) {
+                    catalogosListos = false;
+                    mostrarAvisoCatalogoOperador('No se están actualizando los datos de la planta. Revisá la conexión antes de escanear.');
+                    if (!finalizada) {
+                        finalizada = true;
+                        clearTimeout(temporizador);
+                        reject(error);
+                    } else {
+                        console.error('[Catálogos] Se interrumpió la sincronización en tiempo real:', error);
+                    }
+                }
+
+                function recibir(nombre, aplicar, snapshot) {
+                    if (plantaActiva !== plantaId || !auth.currentUser) return;
+                    aplicar(snapshot);
+                    if (!snapshot.metadata.fromCache) pendientes.delete(nombre);
+                    if (pendientes.size === 0) {
+                        catalogosListos = true;
+                        mostrarAvisoCatalogoOperador();
+                        if (!finalizada) {
+                            finalizada = true;
+                            clearTimeout(temporizador);
+                            resolve();
+                        }
+                    }
+                }
+
+                suscripcionesCatalogos = [
+                    onSnapshot(collection(db, 'plantas', plantaId, 'operadores'), { includeMetadataChanges: true },
+                        snap => recibir('operadores', aplicarOperadoresSnapshot, snap), fallar),
+                    onSnapshot(collection(db, 'plantas', plantaId, 'puntos_control'), { includeMetadataChanges: true },
+                        snap => recibir('puntos_control', aplicarPuntosSnapshot, snap), fallar),
+                    onSnapshot(collection(db, 'plantas', plantaId, 'rutas_horarias'), { includeMetadataChanges: true },
+                        snap => recibir('rutas_horarias', aplicarRutasSnapshot, snap), fallar)
+                ];
+            });
+        }
+
         window.addEventListener('online', () => {
             actualizarEstadoRed();
             sincronizarColaOffline();
@@ -140,80 +263,88 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             document.getElementById('op-skeleton').classList.add('hidden');
             document.getElementById('op-contenido').classList.remove('hidden');
 
-            // Mostrar el login de inmediato si no hay sesión; el listener de auth
-            // lo ocultará si se restaura una sesión válida.
-            if (!sessionStorage.getItem('usuario_uid')) {
-                mostrarModalLogin();
-            }
+            // Mantener la app cubierta hasta restaurar sesión y sincronizar catálogos.
+            mostrarModalLogin();
 
             refrescarVistaOperador();
             iniciarMotorAlertasOperador();
 
             // Listener de autenticación de Firebase. Restaura la sesión al cargar
             // la página y reacciona a cambios (login/logout).
-            onAuthStateChanged(auth, (user) => {
-                (async () => {
-                if (user) {
-                    try {
-                        const perfilSnap = await getDoc(doc(db, 'usuarios', user.uid));
-                        const perfil = perfilSnap.exists() ? perfilSnap.data() : null;
-                        if (!perfil || perfil.activo === false) {
-                            await signOut(auth);
-                            sessionStorage.removeItem('sesion_encargado');
-                            actualizarInterfazSegunRol();
-                            return;
-                        }
-                        const rol = perfil.rol || 'operador';
-                        if (rol === 'superadmin' || rol === 'gerente') {
-                            sessionStorage.setItem('sesion_encargado', 'activa');
-                        } else {
-                            sessionStorage.removeItem('sesion_encargado');
-                        }
-                        // Resolver la planta activa a partir del perfil.
-                        const plantas = perfil.plantas || [];
-                        await configurarPlantasUsuario(plantas, rol);
-                        if (!plantaActiva) {
-                            await signOut(auth);
-                            throw new Error('El usuario no tiene una planta activa asignada.');
-                        }
-                        sessionStorage.setItem('usuario_uid', user.uid);
-                        sessionStorage.setItem('usuario_rol', rol);
-                        sessionStorage.setItem('usuario_nombre', perfil.nombre || user.email.split('@')[0]);
-                        sessionStorage.setItem('usuario_plantas', JSON.stringify(plantas));
-                        actualizarInterfazSegunRol();
-                        cerrarModalLoginEncargado();
-                        try { await llamarApiUsuarios({ accion: 'registrar_acceso' }); }
-                        catch (error) { console.warn('[Accesos] No se pudo guardar el acceso:', error.message); }
-                        // Cargar datos de la app (catálogos + registros).
-                        await Promise.all([
-                            cargarOperadores(),
-                            cargarPuntos(),
-                            cargarRutas(),
-                            cargarRegistrosHoy()
-                        ]);
-                        if ("Notification" in window && Notification.permission === "granted") {
-                            await registrarTokenFCM(rol === 'operador' ? 'operador' : 'encargado');
-                        }
-                        await sincronizarColaOffline();
-                        if (rol === 'superadmin' || rol === 'gerente') limpiarRegistrosAntiguos();
-                        if (perfil.rol === 'superadmin' || perfil.rol === 'gerente') {
-                            await cargarDatosPanelAdmin();
-                            renderizarTodoAdmin();
-                        }
-                        refrescarVistaOperador();
-                    } catch (e) {
-                        console.error('[Auth] Error al cargar perfil:', e);
-                    }
-                } else {
+            onAuthStateChanged(auth, user => {
+                const idInicializacion = ++inicializacionAuthId;
+                if (!user) {
+                    detenerSuscripcionesCatalogos();
                     sessionStorage.removeItem('sesion_encargado');
                     sessionStorage.removeItem('usuario_uid');
                     sessionStorage.removeItem('usuario_rol');
                     sessionStorage.removeItem('usuario_nombre');
                     sessionStorage.removeItem('usuario_plantas');
                     actualizarInterfazSegunRol();
-                    // Mostrar el modal de login si no hay sesión.
                     mostrarModalLogin();
+                    return;
                 }
+
+                (async () => {
+                    try {
+                        detenerSuscripcionesCatalogos();
+                        const perfilSnap = await getDoc(doc(db, 'usuarios', user.uid));
+                        const perfil = perfilSnap.exists() ? perfilSnap.data() : null;
+                        if (!perfil || perfil.activo === false) {
+                            await signOut(auth);
+                            throw new Error('La cuenta no está activa.');
+                        }
+
+                        const rol = perfil.rol || 'operador';
+                        const plantas = perfil.plantas || [];
+                        if (rol === 'superadmin' || rol === 'gerente') sessionStorage.setItem('sesion_encargado', 'activa');
+                        else sessionStorage.removeItem('sesion_encargado');
+                        sessionStorage.setItem('usuario_uid', user.uid);
+                        sessionStorage.setItem('usuario_rol', rol);
+                        sessionStorage.setItem('usuario_nombre', perfil.nombre || user.email.split('@')[0]);
+                        sessionStorage.setItem('usuario_plantas', JSON.stringify(plantas));
+
+                        await configurarPlantasUsuario(plantas, rol);
+                        if (!plantaActiva) {
+                            await signOut(auth);
+                            throw new Error('El usuario no tiene una planta activa asignada.');
+                        }
+                        if (idInicializacion !== inicializacionAuthId) return;
+
+                        // No se habilita el escáner hasta recibir puntos, horarios y
+                        // operadores confirmados por el servidor para esta planta.
+                        await iniciarSuscripcionesCatalogos(plantaActiva);
+                        if (idInicializacion !== inicializacionAuthId || auth.currentUser?.uid !== user.uid) return;
+                        await Promise.all([
+                            cargarRegistrosHoy(),
+                            ['superadmin', 'gerente'].includes(rol) ? cargarRegistrosAdmin() : Promise.resolve()
+                        ]);
+                        if (idInicializacion !== inicializacionAuthId) return;
+
+                        actualizarInterfazSegunRol();
+                        cerrarModalLoginEncargado();
+                        llamarApiUsuarios({ accion: 'registrar_acceso' })
+                            .catch(error => console.warn('[Accesos] No se pudo guardar el acceso:', error.message));
+                        if ("Notification" in window && Notification.permission === "granted") {
+                            registrarTokenFCM(rol === 'operador' ? 'operador' : 'encargado');
+                        }
+                        await sincronizarColaOffline();
+                        if (rol === 'superadmin' || rol === 'gerente') {
+                            limpiarRegistrosAntiguos();
+                            renderizarTodoAdmin();
+                        }
+                        refrescarVistaOperador();
+                    } catch (error) {
+                        if (idInicializacion !== inicializacionAuthId) return;
+                        console.error('[Auth] Error al cargar perfil y catálogos:', error);
+                        detenerSuscripcionesCatalogos();
+                        mostrarModalLogin();
+                        const mensaje = document.getElementById('error-login-encargado');
+                        if (mensaje) {
+                            mensaje.textContent = error.message || 'No se pudieron actualizar los datos de la planta. Revisá tu conexión y recargá.';
+                            mensaje.classList.remove('hidden');
+                        }
+                    }
                 })();
             });
         });
@@ -281,11 +412,16 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             plantaActiva = id;
             sessionStorage.setItem('planta_activa', id);
             offsetDiasFiltro = 0;
-            await sincronizarColaOffline();
-            await cargarDatosPanelAdmin();
-            renderizarTodoAdmin();
-            refrescarVistaOperador();
-            mostrarAvisoPanel(`Planta activa: ${plantasDisponibles.find(p => p.id === id)?.nombre || id}.`, 'ok');
+            try {
+                await sincronizarColaOffline();
+                await iniciarSuscripcionesCatalogos(id);
+                await Promise.all([cargarRegistrosHoy(), cargarRegistrosAdmin()]);
+                renderizarTodoAdmin();
+                refrescarVistaOperador();
+                mostrarAvisoPanel(`Planta activa: ${plantasDisponibles.find(p => p.id === id)?.nombre || id}.`, 'ok');
+            } catch (error) {
+                mostrarAvisoPanel(error.message, 'error');
+            }
         };
 
         function refrescarVistaOperador() {
@@ -337,6 +473,10 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         }
 
         window.abrirSelectorOperador = () => {
+            if (!catalogosListos) {
+                mostrarAvisoCatalogoOperador('Actualizando puntos y horarios de la planta. Esperá unos segundos antes de escanear.');
+                return;
+            }
             const activos = operadoresCache.filter(op => op.activo !== false);
             if (!operadorPreseleccionadoSheet || !activos.some(op => op.nombre === operadorPreseleccionadoSheet)) {
                 operadorPreseleccionadoSheet = activos.length > 0 ? activos[0].nombre : "";
@@ -655,6 +795,10 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         }
 
         window.iniciarCamara = () => {
+            if (!catalogosListos) {
+                mostrarAvisoCatalogoOperador('Actualizando puntos y horarios de la planta. Esperá unos segundos antes de escanear.');
+                return;
+            }
             if (!operadorActivo) {
                 abrirSelectorOperador();
                 return;
@@ -754,6 +898,11 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         async function onScanSuccess(codigoLeido) {
             // Evita registros duplicados si el lector dispara el callback más de una vez.
             if (escaneoEnProceso) return;
+            if (!catalogosListos) {
+                detenerCamara();
+                mostrarAvisoCatalogoOperador('Los catálogos se están actualizando. Volvé a intentar cuando termine la sincronización.');
+                return;
+            }
             escaneoEnProceso = true;
 
             document.querySelectorAll('.esquina-qr').forEach(el => {
@@ -1129,7 +1278,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         };
 
         window.cerrarModalLoginEncargado = () => {
-            if (!sessionStorage.getItem('usuario_uid')) return;
+            if (!sessionStorage.getItem('usuario_uid') || !catalogosListos) return;
             const modal = document.getElementById('modal-login-encargado');
             modal.classList.add('hidden');
             modal.style.display = 'none';
@@ -1162,41 +1311,9 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
             try {
                 const email = usuario + '@rondas.meatex';
-                const cred = await signInWithEmailAndPassword(auth, email, clave);
-                const uid = cred.user.uid;
-
-                const perfilSnap = await getDoc(doc(db, 'usuarios', uid));
-                const perfil = perfilSnap.exists() ? perfilSnap.data() : null;
-                if (!perfil || perfil.activo === false) {
-                    await signOut(auth);
-                    err.classList.remove('hidden');
-                    return;
-                }
-
-                sessionStorage.setItem('usuario_uid', uid);
-                const rolSesion = perfil.rol || 'operador';
-                if (rolSesion === 'superadmin' || rolSesion === 'gerente') sessionStorage.setItem('sesion_encargado', 'activa');
-                else sessionStorage.removeItem('sesion_encargado');
-                sessionStorage.setItem('usuario_rol', rolSesion);
-                sessionStorage.setItem('usuario_nombre', perfil.nombre || usuario);
-                sessionStorage.setItem('usuario_plantas', JSON.stringify(perfil.plantas || []));
-                await configurarPlantasUsuario(perfil.plantas || [], perfil.rol || 'operador');
-                if (!plantaActiva) {
-                    await signOut(auth);
-                    err.textContent = 'Tu usuario todavía no tiene una planta activa asignada.';
-                    err.classList.remove('hidden');
-                    return;
-                }
-
-                cerrarModalLoginEncargado();
-                actualizarInterfazSegunRol();
-                actualizarEstadoVisualNotificaciones();
-                iniciarListenerIncidenciasSupervisor();
-                if ("Notification" in window && Notification.permission === "granted") {
-                    registrarTokenFCM(perfil.rol === 'operador' ? 'operador' : 'encargado');
-                }
-                await cargarDatosPanelAdmin();
-                renderizarTodoAdmin();
+                await signInWithEmailAndPassword(auth, email, clave);
+                err.classList.add('hidden');
+                inputClave.classList.remove('border-[#DC2626]');
             } catch (error) {
                 console.error('[Auth] Error al iniciar sesión:', error);
                 inputClave.classList.add('border-[#DC2626]', 'animar-sacudida');
@@ -1223,9 +1340,9 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         };
 
         function actualizarInterfazSegunRol() {
-            const esEncargado = sessionStorage.getItem('sesion_encargado') === 'activa';
+            const esEncargado = sessionStorage.getItem('sesion_encargado') === 'activa' && catalogosListos;
             const tieneSesion = Boolean(sessionStorage.getItem('usuario_uid'));
-            const esOperadorAutenticado = tieneSesion && !esEncargado;
+            const esOperadorAutenticado = tieneSesion && !esEncargado && catalogosListos;
             const tabUsuarios = document.getElementById('tab-usuarios');
             const tabAdministracion = document.getElementById('tab-administracion');
             const esSuperadmin = sessionStorage.getItem('usuario_rol') === 'superadmin';
@@ -2603,16 +2720,12 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             if (lat === null) return;
             const lng = prompt(`Nueva longitud para ${p.nombre} (actual: ${p.lng}):`, p.lng);
             if (lng === null) return;
-            const tol = prompt(`Radio permitido en metros (actual: ${p.tolerancia || 25}):`, p.tolerancia || 25);
-            if (tol === null) return;
             const latNum = Number(lat);
             const lngNum = Number(lng);
-            const tolNum = Number(tol);
             if (!Number.isFinite(latNum) || latNum < -90 || latNum > 90) return mostrarAvisoPanel('Latitud inválida.', 'error');
             if (!Number.isFinite(lngNum) || lngNum < -180 || lngNum > 180) return mostrarAvisoPanel('Longitud inválida.', 'error');
-            if (!Number.isFinite(tolNum) || tolNum < 10 || tolNum > 100) return mostrarAvisoPanel('El radio debe estar entre 10 y 100 m.', 'error');
             try {
-                await updateDoc(doc(db, 'puntos_control', id), { lat: latNum, lng: lngNum, tolerancia: tolNum });
+                await updateDoc(doc(db, 'plantas', plantaActiva, 'puntos_control', id), { lat: latNum, lng: lngNum });
                 await cargarPuntos();
                 renderizarPuntosAdmin();
                 if (mapaPuntos) actualizarMapaPuntos();
@@ -2620,6 +2733,27 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             } catch (e) {
                 console.error('[Puntos] Error al editar la ubicación:', e);
                 mostrarAvisoPanel('No se pudo actualizar la ubicación. Revisá la conexión y las reglas de Firestore.', 'error');
+            }
+        };
+
+        window.editarRadioPunto = async (id) => {
+            const punto = Object.values(puntosCache).find(p => p.id === id);
+            if (!punto) return mostrarAvisoPanel('No se encontró el punto de control.', 'error');
+            const entrada = prompt(`Radio GPS en metros para ${punto.nombre} (actual: ${punto.tolerancia || 25}):`, punto.tolerancia || 25);
+            if (entrada === null) return;
+            const tolerancia = Number(entrada);
+            if (!Number.isInteger(tolerancia) || tolerancia < 10 || tolerancia > 100) {
+                return mostrarAvisoPanel('El radio debe ser un número entero entre 10 y 100 metros.', 'error');
+            }
+            try {
+                await updateDoc(doc(db, 'plantas', plantaActiva, 'puntos_control', id), { tolerancia });
+                await cargarPuntos();
+                renderizarPuntosAdmin();
+                if (mapaPuntos) actualizarMapaPuntos();
+                mostrarAvisoPanel(`Radio GPS de "${punto.nombre}" actualizado a ${tolerancia} m.`, 'ok');
+            } catch (error) {
+                console.error('[Puntos] Error al editar el radio:', error);
+                mostrarAvisoPanel('No se pudo actualizar el radio. Revisá la conexión y las reglas de Firestore.', 'error');
             }
         };
 
@@ -2677,6 +2811,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 }
                 acciones.append(
                     botonAccion('Editar nombre', 'border-[#E2E8F0] bg-white hover:bg-slate-50 text-[#334155]', () => editarNombrePunto(p.id)),
+                    botonAccion('Editar radio', 'border-[#E2E8F0] bg-white hover:bg-slate-50 text-[#334155]', () => editarRadioPunto(p.id)),
                     botonAccion('Recalibrar aquí', 'border-[#0F172A] bg-[#0F172A] text-white hover:bg-[#1E293B]', () => recalibrarPunto(p.id)),
                     botonAccion('Editar ubicación', 'border-[#E2E8F0] bg-white hover:bg-slate-50 text-[#334155]', () => editarUbicacionPunto(p.id)),
                     botonAccion('QR', 'border-[#E2E8F0] bg-white hover:bg-slate-50 text-[#334155]', () => abrirModalQRPorId(p.id)),
@@ -2874,6 +3009,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                         <td class="py-3.5 px-5 text-right space-x-1">
                             <button onclick="abrirModalQRPorId('${p.id}')" class="h-8 px-2.5 bg-white border border-[#E2E8F0] hover:bg-slate-50 rounded text-xs font-semibold text-[#334155]"><i class="fa-solid fa-qrcode mr-1"></i> QR</button>
                             <button onclick="editarNombrePunto('${p.id}')" title="Editar nombre del punto" class="h-8 px-2 bg-white border border-[#E2E8F0] hover:bg-slate-50 rounded text-xs text-[#334155]"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="editarRadioPunto('${p.id}')" title="Editar radio GPS" class="h-8 px-2 bg-white border border-[#E2E8F0] hover:bg-slate-50 rounded text-xs text-[#334155]"><i class="fa-solid fa-bullseye"></i></button>
                             <button onclick="eliminarPunto('${p.id}')" class="h-8 px-2 bg-white border border-red-200 hover:bg-red-50 rounded text-xs text-red-600"><i class="fa-solid fa-trash"></i></button>
                         </td>
                     </tr>

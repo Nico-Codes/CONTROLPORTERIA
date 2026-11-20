@@ -63,7 +63,7 @@ comprobar('La administración solo aparece y responde al superadmin', contiene('
 comprobar('El superadmin puede crear y deshabilitar plantas', apiUsuarios.includes("accion === 'crear_planta'") && apiUsuarios.includes("accion === 'estado_planta'") && contiene('window.crearPlantaSistema'));
 comprobar('Los ajustes globales controlan ambos emisores', apiUsuarios.includes("accion === 'guardar_ajustes_push'") && emisorVercel.includes("doc('push_settings')") && emisorAlternativo.includes("doc('push_settings')") && emisorVercel.includes('if (!notificacionesActivas) continue;') && emisorAlternativo.includes('if (!notificacionesActivas) continue;'));
 comprobar('Los accesos registran ubicación aproximada y protegen su colección', apiUsuarios.includes("accion === 'registrar_acceso'") && apiUsuarios.includes("'x-vercel-ip-city'") && reglas.includes('match /auditoria_accesos/{doc}') && reglas.includes('allow read, write: if false;'));
-comprobar('El login es una vista opaca e independiente', html.includes('z-[100] min-h-screen overflow-y-auto bg-[#F7F7F5]') && contiene("modal.style.display = 'flex';") && contiene('const esOperadorAutenticado = tieneSesion && !esEncargado;'));
+comprobar('El login es una vista opaca e independiente', html.includes('z-[100] min-h-screen overflow-y-auto bg-[#F7F7F5]') && contiene("modal.style.display = 'flex';") && contiene('const esOperadorAutenticado = tieneSesion && !esEncargado && catalogosListos;'));
 comprobar('No quedan IDs inexistentes del bug original', !contiene('badge-criticos-tab') && !contiene('bar-validos') && !contiene('bar-adv') && !contiene('bar-crit'));
 
 // Operadores
@@ -77,6 +77,9 @@ comprobar('Eliminar punto borra sus rutas en lote', contiene('rutasAsociadas.for
 comprobar('No se permiten nombres de punto duplicados', contiene('if (existePuntoConNombre(nombre))'));
 comprobar('Editar un punto solo modifica su nombre', contiene('updateDoc(doc(db, "plantas", plantaActiva, "puntos_control", id), { nombre });'));
 comprobar('Recalibrar un punto actualiza la ubicación dentro de la planta activa', contiene("updateDoc(doc(db, 'plantas', plantaActiva, 'puntos_control', id), { lat, lng });"));
+comprobar('El escáner espera la sincronización de puntos y horarios', contiene('function iniciarSuscripcionesCatalogos(plantaId)') && contiene('if (!snapshot.metadata.fromCache) pendientes.delete(nombre);') && contiene('if (!catalogosListos) {'));
+comprobar('Puntos, rutas y operadores se actualizan con listeners de Firestore', contiene("onSnapshot(collection(db, 'plantas', plantaId, 'puntos_control')") && contiene("onSnapshot(collection(db, 'plantas', plantaId, 'rutas_horarias')") && contiene("onSnapshot(collection(db, 'plantas', plantaId, 'operadores')"));
+comprobar('Se puede editar el radio GPS de un punto desde el panel y el mapa', contiene('window.editarRadioPunto = async (id) =>') && contiene("updateDoc(doc(db, 'plantas', plantaActiva, 'puntos_control', id), { tolerancia });") && contiene('botonAccion(\'Editar radio\'') && contiene('editarRadioPunto(\'${p.id}\')'));
 comprobar('Editar el punto conserva su código QR y evita nombres duplicados', contiene('existePuntoConNombre(nombre, punto.codigo)'));
 comprobar('Los horarios asociados reciben el nuevo nombre', contiene('lote.update(ruta.ref, { puntoNombre: nombre })'));
 comprobar('La programación permite elegir puntos desde el mapa', contiene('window.abrirModalMapaRuta'));

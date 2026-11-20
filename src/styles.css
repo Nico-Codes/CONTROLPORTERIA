@@ -73,10 +73,19 @@ body {
             border: 3px solid #FFFFFF;
             box-shadow: 0 0 0 4px #2563EB55, 0 2px 6px #00000066;
         }
-        /* Oculta el texto de atribución de los proveedores de tiles (Leaflet).
-           Los créditos legales se mantienen en el código; solo se oculta visualmente. */
+        /* Crédito mínimo y discreto de los proveedores de tiles. */
         .leaflet-control-attribution {
-            display: none !important;
+            font-size: 7px !important;
+            line-height: 1.1 !important;
+            color: rgba(15, 23, 42, 0.45) !important;
+            background: rgba(255, 255, 255, 0.6) !important;
+            padding: 1px 4px !important;
+            border-radius: 3px !important;
+            box-shadow: none !important;
+            margin: 0 2px 2px 0 !important;
+        }
+        .leaflet-control-attribution a {
+            color: rgba(15, 23, 42, 0.55) !important;
         }
         .no-scrollbar::-webkit-scrollbar {
             display: none;

@@ -1974,6 +1974,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             if (!mapaPuntosRutas) {
                 mapaPuntosRutas = window.L.map(contenedor, { scrollWheelZoom: true, attributionControl: false });
                 agregarCapasBase(mapaPuntosRutas);
+                window.L.control.attribution({ position: 'bottomright', prefix: false }).addTo(mapaPuntosRutas);
                 capaPuntosRutas = window.L.featureGroup().addTo(mapaPuntosRutas);
             }
 
@@ -2031,6 +2032,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             if (!mapaPuntos) {
                 mapaPuntos = window.L.map(contenedor, { scrollWheelZoom: true, attributionControl: false });
                 agregarCapasBase(mapaPuntos);
+                window.L.control.attribution({ position: 'bottomright', prefix: false }).addTo(mapaPuntos);
                 capaPuntos = window.L.featureGroup().addTo(mapaPuntos);
             }
             actualizarMapaPuntos();

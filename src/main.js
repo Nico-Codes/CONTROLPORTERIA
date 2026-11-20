@@ -1934,14 +1934,14 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             if (!window.L) return;
             const transparente = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
             const satelite = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 20,
-                maxNativeZoom: 19,
+                maxZoom: 18,
+                maxNativeZoom: 18,
                 errorTileUrl: transparente,
                 attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
             });
             const etiquetas = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 20,
-                maxNativeZoom: 19,
+                maxZoom: 18,
+                maxNativeZoom: 18,
                 errorTileUrl: transparente,
                 attribution: 'Labels &copy; Esri'
             });
@@ -1972,7 +1972,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
             const contenedor = document.getElementById('mapa-puntos-ruta');
             if (!mapaPuntosRutas) {
-                mapaPuntosRutas = window.L.map(contenedor, { scrollWheelZoom: true, attributionControl: false, maxZoom: 19 });
+                mapaPuntosRutas = window.L.map(contenedor, { scrollWheelZoom: true, attributionControl: false, maxZoom: 18 });
                 agregarCapasBase(mapaPuntosRutas);
                 window.L.control.attribution({ position: 'bottomright', prefix: false }).addTo(mapaPuntosRutas);
                 capaPuntosRutas = window.L.featureGroup().addTo(mapaPuntosRutas);
@@ -2030,7 +2030,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             }
             const contenedor = document.getElementById('mapa-puntos');
             if (!mapaPuntos) {
-                mapaPuntos = window.L.map(contenedor, { scrollWheelZoom: true, attributionControl: false, maxZoom: 19 });
+                mapaPuntos = window.L.map(contenedor, { scrollWheelZoom: true, attributionControl: false, maxZoom: 18 });
                 agregarCapasBase(mapaPuntos);
                 window.L.control.attribution({ position: 'bottomright', prefix: false }).addTo(mapaPuntos);
                 capaPuntos = window.L.featureGroup().addTo(mapaPuntos);

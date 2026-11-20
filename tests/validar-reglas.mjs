@@ -75,7 +75,7 @@ comprobar('El mapa permite seleccionar varios puntos simultáneamente', contiene
 comprobar('La programación crea cada combinación de punto y día', contiene('codigosQR.forEach(codigoQR => {') && contiene('diasSeleccionadosForm.forEach(dia => {') && contiene('batch.set(ref, { dia, codigoQR, puntoNombre, hora, margen })'));
 comprobar('El modal llama al renderizador existente del mapa', contiene('actualizarPuntosMapaRuta();') && !contiene('renderizarListaPuntosMapaRuta()'));
 comprobar('El mapa posiciona los puntos con sus coordenadas', contiene('window.L.marker([lat, lng]'));
-comprobar('El mapa muestra atribución de OpenStreetMap', contiene('tile.openstreetmap.org') && contiene('openstreetmap.org/copyright'));
+comprobar('El mapa muestra atribución de los proveedores de tiles', contiene('arcgisonline.com') && contiene('Esri'));
 comprobar('No se permiten operadores duplicados', contiene('operadoresCache.some(op => String(op.nombre || \'\').trim().toLowerCase() === nombre.toLowerCase())'));
 
 // Exportación

@@ -95,7 +95,7 @@ Los nuevos registros incluyen `timestampMs`, `fechaISO`, `rutaId`, `diaRuta`, `m
 
 ## 6. Panel y exportación
 
-El encargado puede cambiar el nombre de un punto sin alterar su código QR. Los horarios asociados reciben el nombre actualizado; los registros históricos conservan el nombre guardado al momento del escaneo. En la pestaña Programación de horarios se pueden seleccionar varios puntos desde el mapa Leaflet con cartografía de OpenStreetMap y asignarles en conjunto los mismos días, hora y margen. Se crea una programación independiente por cada combinación de punto y día. El mapa requiere Internet y muestra su atribución.
+El encargado puede cambiar el nombre de un punto sin alterar su código QR. Los horarios asociados reciben el nombre actualizado; los registros históricos conservan el nombre guardado al momento del escaneo. En la pestaña Programación de horarios se pueden seleccionar varios puntos desde el mapa Leaflet con imágenes satelitales de Esri (sin API key) y asignarles en conjunto los mismos días, hora y margen. Se crea una programación independiente por cada combinación de punto y día. El mapa requiere Internet y muestra su atribución.
 
 La barra superior del panel permite retroceder o avanzar de a un día y abrir un calendario. El selector no admite fechas futuras; el mínimo es la fecha del registro más antiguo disponible. Si se elige un día sin registros, el panel avisa y vuelve a la fecha anterior.
 

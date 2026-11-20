@@ -97,7 +97,7 @@ La constante `VAPID_KEY` de `src/main.js` está vacía en la revisión indicada.
 
 ## 5. Diagnóstico de mapa, rutas y fechas
 
-- El mapa usa Leaflet y mosaicos de OpenStreetMap; necesita acceso de red a esos servicios.
+- El mapa usa Leaflet con imágenes satelitales de Esri (sin API key); necesita acceso de red a esos servicios.
 - Un punto solo aparece como marcador si tiene latitud y longitud numéricas válidas.
 - La lista lateral permite marcar o desmarcar varios puntos; después se confirman en conjunto.
 - Días, hora objetivo y tolerancia elegidos se aplican a cada punto seleccionado. Se guarda un documento separado por cada día y punto.

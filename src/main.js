@@ -1945,22 +1945,10 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 errorTileUrl: transparente,
                 attribution: 'Labels &copy; Esri'
             });
-            const calles = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 20,
-                maxNativeZoom: 19,
-                errorTileUrl: transparente,
-                attribution: 'Tiles &copy; Esri'
-            });
-            const osm = window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 20,
-                maxNativeZoom: 19,
-                errorTileUrl: transparente,
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'
-            });
             satelite.addTo(mapa);
             etiquetas.addTo(mapa);
             window.L.control.layers(
-                { 'Satélite': satelite, 'Calles (Esri)': calles, 'OpenStreetMap': osm },
+                {},
                 { 'Etiquetas': etiquetas },
                 { position: 'topright', collapsed: true }
             ).addTo(mapa);

@@ -62,6 +62,8 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         let offsetDiasFiltro = 0;
         let timerAutocierreAlerta = null;
         let timerAvisoPanel = null;
+        let resolverDialogoWeb = null;
+        let camposDialogoWeb = [];
         let escaneoEnProceso = false;
         let mapaPuntosRutas = null;
         let capaPuntosRutas = null;
@@ -96,6 +98,107 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             el.className = `rounded-lg border px-4 py-3 text-sm font-medium ${estilos[tipo] || estilos.ok}`;
             if (timerAvisoPanel) clearTimeout(timerAvisoPanel);
             timerAvisoPanel = setTimeout(() => el.classList.add('hidden'), 6000);
+        }
+
+        function cerrarDialogoWeb(resultado = null) {
+            const modal = document.getElementById('modal-dialogo-web');
+            if (modal) modal.classList.add('hidden');
+            const resolver = resolverDialogoWeb;
+            resolverDialogoWeb = null;
+            camposDialogoWeb = [];
+            if (resolver) resolver(resultado);
+        }
+
+        function abrirDialogoWeb({ titulo, mensaje = '', campos = [], confirmar = 'Guardar', cancelar = 'Cancelar', peligro = false } = {}) {
+            const modal = document.getElementById('modal-dialogo-web');
+            if (!modal) return Promise.resolve(null);
+            if (resolverDialogoWeb) cerrarDialogoWeb(null);
+
+            document.getElementById('dialogo-web-titulo').textContent = titulo || 'Confirmar';
+            document.getElementById('dialogo-web-mensaje').textContent = mensaje;
+            document.getElementById('dialogo-web-mensaje').classList.toggle('hidden', !mensaje);
+            document.getElementById('dialogo-web-error').classList.add('hidden');
+            document.getElementById('dialogo-web-cancelar').textContent = cancelar;
+            const botonConfirmar = document.getElementById('dialogo-web-confirmar');
+            botonConfirmar.textContent = confirmar;
+            botonConfirmar.className = peligro
+                ? 'h-10 px-4 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition'
+                : 'h-10 px-4 rounded-lg bg-[#0F172A] hover:bg-[#1E293B] text-white text-sm font-semibold transition';
+
+            const contenedorCampos = document.getElementById('dialogo-web-campos');
+            contenedorCampos.replaceChildren();
+            camposDialogoWeb = campos;
+            campos.forEach((campo, indice) => {
+                const etiqueta = document.createElement('label');
+                etiqueta.className = 'block space-y-1.5';
+                etiqueta.htmlFor = `dialogo-web-campo-${indice}`;
+                const texto = document.createElement('span');
+                texto.className = 'block text-sm font-medium text-[#334155]';
+                texto.textContent = campo.etiqueta;
+                const input = document.createElement('input');
+                input.id = etiqueta.htmlFor;
+                input.name = campo.nombre;
+                input.type = campo.tipo || 'text';
+                input.value = campo.valor ?? '';
+                input.placeholder = campo.placeholder || '';
+                input.autocomplete = campo.autocomplete || 'off';
+                input.className = 'h-11 w-full rounded-lg border border-[#CBD5E1] bg-white px-3 text-sm text-[#0F172A] outline-none transition focus:border-[#0F172A] focus:ring-2 focus:ring-[#0F172A]/10';
+                if (campo.min !== undefined) input.min = String(campo.min);
+                if (campo.max !== undefined) input.max = String(campo.max);
+                if (campo.step !== undefined) input.step = String(campo.step);
+                etiqueta.append(texto, input);
+                contenedorCampos.appendChild(etiqueta);
+            });
+
+            modal.setAttribute('role', campos.length ? 'dialog' : 'alertdialog');
+            modal.classList.remove('hidden');
+            resolverDialogoWeb = null;
+            return new Promise(resolve => {
+                resolverDialogoWeb = resolve;
+                requestAnimationFrame(() => {
+                    const primerCampo = contenedorCampos.querySelector('input');
+                    (primerCampo || botonConfirmar).focus();
+                });
+            });
+        }
+
+        window.confirmarDialogoWeb = () => {
+            const valores = {};
+            for (let indice = 0; indice < camposDialogoWeb.length; indice++) {
+                const campo = camposDialogoWeb[indice];
+                const input = document.getElementById(`dialogo-web-campo-${indice}`);
+                const valor = input.value;
+                let error = '';
+                if (campo.requerido !== false && !valor.trim()) error = `Completá “${campo.etiqueta}”.`;
+                else if (campo.tipo === 'number') {
+                    const numero = Number(valor);
+                    if (!Number.isFinite(numero)) error = `Ingresá un valor válido para “${campo.etiqueta}”.`;
+                    else if (campo.entero && !Number.isInteger(numero)) error = `“${campo.etiqueta}” debe ser un número entero.`;
+                    else if (campo.min !== undefined && numero < campo.min) error = `“${campo.etiqueta}” debe ser como mínimo ${campo.min}.`;
+                    else if (campo.max !== undefined && numero > campo.max) error = `“${campo.etiqueta}” no puede superar ${campo.max}.`;
+                } else if (campo.minLength && valor.length < campo.minLength) {
+                    error = `“${campo.etiqueta}” debe tener al menos ${campo.minLength} caracteres.`;
+                } else if (campo.maxLength && valor.length > campo.maxLength) {
+                    error = `“${campo.etiqueta}” no puede superar ${campo.maxLength} caracteres.`;
+                }
+                if (error) {
+                    const aviso = document.getElementById('dialogo-web-error');
+                    aviso.textContent = error;
+                    aviso.classList.remove('hidden');
+                    input.classList.add('border-red-500');
+                    input.focus();
+                    return;
+                }
+                input.classList.remove('border-red-500');
+                valores[campo.nombre] = valor;
+            }
+            cerrarDialogoWeb(camposDialogoWeb.length ? valores : true);
+        };
+
+        window.cancelarDialogoWeb = () => cerrarDialogoWeb(null);
+
+        function confirmarAccionWeb(opciones) {
+            return abrirDialogoWeb({ ...opciones, confirmar: opciones.confirmar || 'Confirmar' });
         }
 
         function mostrarModalLogin() {
@@ -252,6 +355,17 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         window.addEventListener('offline', actualizarEstadoRed);
 
         window.addEventListener('DOMContentLoaded', async () => {
+            const modalDialogo = document.getElementById('modal-dialogo-web');
+            modalDialogo?.addEventListener('click', evento => {
+                if (evento.target === evento.currentTarget) cancelarDialogoWeb();
+            });
+            document.addEventListener('keydown', evento => {
+                if (evento.key === 'Escape' && !modalDialogo?.classList.contains('hidden')) cancelarDialogoWeb();
+                if (evento.key === 'Enter' && !modalDialogo?.classList.contains('hidden') && evento.target?.tagName === 'INPUT') {
+                    evento.preventDefault();
+                    confirmarDialogoWeb();
+                }
+            });
             actualizarRelojYFechaHeader();
             setInterval(actualizarRelojYFechaHeader, 15000);
             actualizarEstadoRed();
@@ -1951,16 +2065,27 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         };
 
         async function restablecerClaveUsuario(uid) {
-            const clave = prompt('Ingresá la nueva contraseña (mínimo 8 caracteres):');
-            if (clave === null) return;
+            const valores = await abrirDialogoWeb({
+                titulo: 'Restablecer contraseña',
+                mensaje: 'Ingresá una nueva contraseña de al menos 8 caracteres.',
+                campos: [{ nombre: 'clave', etiqueta: 'Nueva contraseña', tipo: 'password', autocomplete: 'new-password', minLength: 8 }],
+                confirmar: 'Actualizar contraseña'
+            });
+            if (!valores) return;
             try {
-                await llamarApiUsuarios({ accion: 'clave', uid, clave });
+                await llamarApiUsuarios({ accion: 'clave', uid, clave: valores.clave });
                 mostrarAvisoUsuarios('Contraseña actualizada y sesiones anteriores revocadas.');
             } catch (error) { mostrarAvisoUsuarios(error.message, true); }
         }
 
         async function cambiarEstadoUsuarioSistema(uid, activo) {
-            if (!confirm(activo ? '¿Activar este usuario?' : '¿Desactivar este usuario?')) return;
+            const confirmado = await confirmarAccionWeb({
+                titulo: activo ? 'Activar usuario' : 'Desactivar usuario',
+                mensaje: activo ? '¿Querés volver a habilitar el acceso de este usuario?' : '¿Querés quitarle el acceso a este usuario?',
+                confirmar: activo ? 'Activar usuario' : 'Desactivar usuario',
+                peligro: !activo
+            });
+            if (!confirmado) return;
             try {
                 await llamarApiUsuarios({ accion: 'estado', uid, activo });
                 await cargarUsuariosSistema();
@@ -2653,7 +2778,12 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 const lat = pos.coords.latitude;
                 const lng = pos.coords.longitude;
                 const precision = Math.round(pos.coords.accuracy);
-                if (!confirm(`¿Recalibrar "${p.nombre}" a tu ubicación actual?\nLat: ${lat.toFixed(6)}  Lng: ${lng.toFixed(6)}  (±${precision} m)`)) return;
+                const confirmado = await confirmarAccionWeb({
+                    titulo: 'Recalibrar punto',
+                    mensaje: `¿Recalibrar "${p.nombre}" a tu ubicación actual?\nLat: ${lat.toFixed(6)}  Lng: ${lng.toFixed(6)}  (±${precision} m)`,
+                    confirmar: 'Recalibrar'
+                });
+                if (!confirmado) return;
                 try {
                     await updateDoc(doc(db, 'plantas', plantaActiva, 'puntos_control', id), { lat, lng });
                     await cargarPuntos();
@@ -2716,12 +2846,17 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         window.editarUbicacionPunto = async (id) => {
             const p = Object.values(puntosCache).find(x => x.id === id);
             if (!p) return mostrarAvisoPanel('No se encontró el punto de control.', 'error');
-            const lat = prompt(`Nueva latitud para ${p.nombre} (actual: ${p.lat}):`, p.lat);
-            if (lat === null) return;
-            const lng = prompt(`Nueva longitud para ${p.nombre} (actual: ${p.lng}):`, p.lng);
-            if (lng === null) return;
-            const latNum = Number(lat);
-            const lngNum = Number(lng);
+            const valores = await abrirDialogoWeb({
+                titulo: 'Editar ubicación',
+                mensaje: `Actualizá las coordenadas de “${p.nombre}”.`,
+                campos: [
+                    { nombre: 'lat', etiqueta: 'Latitud', tipo: 'number', valor: p.lat, min: -90, max: 90, step: 'any' },
+                    { nombre: 'lng', etiqueta: 'Longitud', tipo: 'number', valor: p.lng, min: -180, max: 180, step: 'any' }
+                ]
+            });
+            if (!valores) return;
+            const latNum = Number(valores.lat);
+            const lngNum = Number(valores.lng);
             if (!Number.isFinite(latNum) || latNum < -90 || latNum > 90) return mostrarAvisoPanel('Latitud inválida.', 'error');
             if (!Number.isFinite(lngNum) || lngNum < -180 || lngNum > 180) return mostrarAvisoPanel('Longitud inválida.', 'error');
             try {
@@ -2739,9 +2874,13 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         window.editarRadioPunto = async (id) => {
             const punto = Object.values(puntosCache).find(p => p.id === id);
             if (!punto) return mostrarAvisoPanel('No se encontró el punto de control.', 'error');
-            const entrada = prompt(`Radio GPS en metros para ${punto.nombre} (actual: ${punto.tolerancia || 25}):`, punto.tolerancia || 25);
-            if (entrada === null) return;
-            const tolerancia = Number(entrada);
+            const valores = await abrirDialogoWeb({
+                titulo: 'Editar radio GPS',
+                mensaje: `Definí la distancia máxima para validar “${punto.nombre}”.`,
+                campos: [{ nombre: 'radio', etiqueta: 'Radio en metros (10 a 100)', tipo: 'number', valor: punto.tolerancia || 25, min: 10, max: 100, step: 1, entero: true }]
+            });
+            if (!valores) return;
+            const tolerancia = Number(valores.radio);
             if (!Number.isInteger(tolerancia) || tolerancia < 10 || tolerancia > 100) {
                 return mostrarAvisoPanel('El radio debe ser un número entero entre 10 y 100 metros.', 'error');
             }
@@ -3378,9 +3517,13 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             const punto = Object.values(puntosCache).find(p => p.id === id);
             if (!punto) return mostrarAvisoPanel('No se encontró el punto de control.', 'error');
 
-            const entrada = prompt(`Nuevo nombre para ${punto.nombre}. El código ${punto.codigo} no se modifica:`, punto.nombre);
-            if (entrada === null) return;
-            const nombre = entrada.trim();
+            const valores = await abrirDialogoWeb({
+                titulo: 'Editar nombre del punto',
+                mensaje: `El código QR ${punto.codigo} se conserva.`,
+                campos: [{ nombre: 'nombre', etiqueta: 'Nombre del punto', valor: punto.nombre, maxLength: 80 }]
+            });
+            if (!valores) return;
+            const nombre = valores.nombre.trim();
             if (!nombre) return mostrarAvisoPanel('El nombre del punto no puede quedar vacío.', 'error');
             if (nombre.length > 80) return mostrarAvisoPanel('El nombre no puede superar los 80 caracteres.', 'error');
             if (existePuntoConNombre(nombre, punto.codigo)) return mostrarAvisoPanel('Ya existe otro punto con ese nombre.', 'error');
@@ -3417,7 +3560,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             const aviso = rutasAsociadas.length > 0
                 ? `¿Eliminar "${nombre}"? También se eliminarán ${rutasAsociadas.length} horario(s) asociado(s).`
                 : `¿Eliminar "${nombre}"?`;
-            if (!confirm(aviso)) return;
+            if (!await confirmarAccionWeb({ titulo: 'Eliminar punto de control', mensaje: aviso, confirmar: 'Eliminar punto', peligro: true })) return;
 
             try {
                 const batch = writeBatch(db);
@@ -3437,7 +3580,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
         window.eliminarRuta = async (id) => {
             const r = rutasCache.find(x => x.id === id);
-            if (!confirm(`¿Eliminar el horario ${r ? r.hora : ''} de ${r ? r.puntoNombre : 'este punto'}?`)) return;
+            if (!await confirmarAccionWeb({ titulo: 'Eliminar horario', mensaje: `¿Eliminar el horario ${r ? r.hora : ''} de ${r ? r.puntoNombre : 'este punto'}?`, confirmar: 'Eliminar horario', peligro: true })) return;
 
             try {
                 await deleteDoc(doc(db, "plantas", plantaActiva, "rutas_horarias", id));
@@ -3454,7 +3597,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         window.eliminarOperador = async (id) => {
             const op = operadoresCache.find(x => x.id === id);
             const nombre = op ? op.nombre : "este operador";
-            if (!confirm(`¿Eliminar a "${nombre}"? El historial de escaneos se conserva.`)) return;
+            if (!await confirmarAccionWeb({ titulo: 'Eliminar operador', mensaje: `¿Eliminar a "${nombre}"? El historial de escaneos se conserva.`, confirmar: 'Eliminar operador', peligro: true })) return;
 
             try {
                 await deleteDoc(doc(db, "plantas", plantaActiva, "operadores", id));

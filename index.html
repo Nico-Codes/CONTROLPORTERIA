@@ -1168,6 +1168,23 @@
         </div>
     </div>
 
+    <!-- Diálogo propio para edición y confirmaciones -->
+    <div id="modal-dialogo-web" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="dialogo-web-titulo" aria-describedby="dialogo-web-mensaje" tabindex="-1">
+        <section class="w-full max-w-md rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-2xl sm:p-6">
+            <div class="mb-5">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#64748B]">Control de Rondas · Meatex</p>
+                <h2 id="dialogo-web-titulo" class="mt-1 text-lg font-semibold text-[#0F172A]">Confirmar</h2>
+                <p id="dialogo-web-mensaje" class="mt-2 whitespace-pre-line text-sm leading-6 text-[#475569]"></p>
+            </div>
+            <div id="dialogo-web-campos" class="space-y-4"></div>
+            <p id="dialogo-web-error" class="hidden mt-3 text-sm font-medium text-red-700" role="alert" aria-live="assertive"></p>
+            <div class="mt-6 flex justify-end gap-2">
+                <button id="dialogo-web-cancelar" type="button" onclick="cancelarDialogoWeb()" class="h-10 rounded-lg border border-[#CBD5E1] bg-white px-4 text-sm font-semibold text-[#334155] transition hover:bg-slate-50">Cancelar</button>
+                <button id="dialogo-web-confirmar" type="button" onclick="confirmarDialogoWeb()" class="h-10 rounded-lg bg-[#0F172A] px-4 text-sm font-semibold text-white transition hover:bg-[#1E293B]">Guardar</button>
+            </div>
+        </section>
+    </div>
+
     <!-- FOOTER CORPORATIVO (SOLO ENCARGADO) -->
     <footer id="footer-encargado" class="hidden bg-white border-t border-[#E2E8F0] py-3 mt-auto">
         <div class="max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8 text-center text-[11px] text-[#94A3B8]">

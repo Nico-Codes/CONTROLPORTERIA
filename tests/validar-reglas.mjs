@@ -69,10 +69,12 @@ comprobar('No quedan IDs inexistentes del bug original', !contiene('badge-critic
 // Operadores
 comprobar('Existe activar/desactivar operador', contiene('window.toggleOperadorActivo = async (id, activo)'));
 comprobar('La tabla de personal usa métricas reales', contiene('const escaneosOp = regsDia.filter(r => r.operador === op.nombre);'));
-comprobar('Eliminar operador pide confirmación', contiene('if (!confirm(`¿Eliminar a "${nombre}"? El historial de escaneos se conserva.`)) return;'));
+comprobar('Eliminar operador usa confirmación propia', contiene("titulo: 'Eliminar operador'") && contiene('confirmarAccionWeb({ titulo:'));
 
 // Puntos y rutas
-comprobar('Eliminar punto pide confirmación', contiene('if (!confirm(aviso)) return;'));
+comprobar('Eliminar punto usa confirmación propia', contiene("titulo: 'Eliminar punto de control'") && contiene('confirmar: \'Eliminar punto\', peligro: true'));
+const codigoSinInstalacionPwa = codigo.replaceAll('deferredInstallPrompt.prompt(', '');
+comprobar('Las ediciones usan diálogos propios y no alertas nativas', html.includes('id="modal-dialogo-web"') && !/\b(?:prompt|confirm|alert)\s*\(/.test(codigoSinInstalacionPwa));
 comprobar('Eliminar punto borra sus rutas en lote', contiene('rutasAsociadas.forEach(r => batch.delete(doc(db, "plantas", plantaActiva, "rutas_horarias", r.id)));'));
 comprobar('No se permiten nombres de punto duplicados', contiene('if (existePuntoConNombre(nombre))'));
 comprobar('Editar un punto solo modifica su nombre', contiene('updateDoc(doc(db, "plantas", plantaActiva, "puntos_control", id), { nombre });'));

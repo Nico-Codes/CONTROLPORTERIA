@@ -22,7 +22,7 @@ try {
     console.warn('[SW] Firebase Messaging no disponible en este entorno:', e);
 }
 
-const CACHE_NAME = 'rondas-shell-v3';
+const CACHE_NAME = 'rondas-shell-v4';
 const CORE_ASSETS = ['/', '/index.html', '/manifest.json', '/icon-192.png', '/icon-512.png', '/badge-72.png'];
 
 // Instalación: precache del app shell.

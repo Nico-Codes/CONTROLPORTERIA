@@ -63,9 +63,14 @@ El botón **Continuar** permanece deshabilitado hasta que los tres requisitos es
 
 ### Encargado
 
-La sesión de la interfaz se guarda en `sessionStorage`. El panel tiene las secciones Auditoría, Puntos de control, Programación de horarios y Personal. Permite filtrar registros, administrar rutas y operadores, activar/desactivar operadores, generar QR, consultar métricas y exportar XLSX.
+La sesión se gestiona con **Firebase Authentication** (email/contraseña con email sintético `usuario@rondas.meatex`). El panel tiene las secciones Auditoría, Puntos de control, Programación de horarios y Personal. Permite filtrar registros, administrar rutas y operadores, activar/desactivar operadores, generar QR, consultar métricas y exportar XLSX.
 
-La contraseña `admin123` está en código cliente. Es una barrera visual de la interfaz, no un mecanismo de autenticación seguro.
+Roles:
+- **Superadmin:** gestión total (plantas, usuarios, contraseñas, datos).
+- **Gerente:** gestión de su planta (puntos, rutas, operadores).
+- **Operador:** escaneo de QR y consulta de agenda.
+
+No hay auto-registro: el superadmin crea los usuarios con `tools/crear_superadmin.js` (o el panel, en fases posteriores).
 
 ## 4. Reglas de rondas
 
@@ -136,9 +141,11 @@ No se deben ejecutar ambos emisores simultáneamente sin evaluar duplicados y co
 
 ## 10. Seguridad y privacidad
 
-Las reglas actuales permiten acceso abierto de lectura/escritura a catálogos, dispositivos y configuración; permiten lectura, creación y borrado de registros, pero niegan su actualización. No hay Firebase Auth. Como resultado, cualquier cliente que conozca la configuración pública del proyecto puede acceder a las colecciones permitidas, independientemente de la contraseña de la UI.
+La app usa **Firebase Authentication** (email/contraseña). Las reglas de Firestore exigen `request.auth != null` para todas las colecciones. Los perfiles de usuario (`usuarios/{uid}`) solo son legibles por su propio dueño; su escritura está denegada desde el cliente (solo Admin SDK).
 
-El endpoint serverless usa `CRON_SECRET` para limitar invocaciones. Esto protege ese endpoint, pero no restringe el acceso directo a Firestore. La cuenta de servicio debe guardarse únicamente en secretos de GitHub/Vercel y nunca en el frontend.
+El endpoint serverless usa `CRON_SECRET` para limitar invocaciones. Esto protege ese endpoint, pero no reemplaza la autenticación de Firestore. La cuenta de servicio debe guardarse únicamente en secretos de GitHub/Vercel y nunca en el frontend.
+
+El primer superadmin se crea con `tools/crear_superadmin.js` (requiere `FIREBASE_SERVICE_ACCOUNT`). No hay auto-registro.
 
 La selección de operador no verifica identidad. Desactivar un operador lo oculta de la vista/selector; eliminarlo no elimina su historial de escaneos.
 
@@ -160,8 +167,8 @@ Vite usa `index.html` en la raíz y genera `dist/`. Vercel sirve ese directorio 
 
 ## 13. Limitaciones conocidas
 
-- Doble control de acceso insuficiente para producción: clave de encargado en el cliente y reglas Firestore abiertas.
-- No hay autenticación de operadores.
+- La autenticación usa Firebase Auth con emails sintéticos (`usuario@rondas.meatex`). La gestión de usuarios (Fase 3) aún no está implementada en el panel; se crea el superadmin por script.
+- El multi-planta (Fase 2) aún no está implementado; los datos siguen en colecciones top-level.
 - La clave VAPID está vacía por defecto.
 - La app no garantiza arranque offline ni persistencia local de Firestore.
 - Los emisores y la app dependen de servicios externos/CDN y conectividad para sincronizar.
@@ -174,3 +181,4 @@ Vite usa `index.html` en la raíz y genera `dist/`. Vercel sirve ese directorio 
 - `GUIA_OPERATIVA.md`: configuración de servicios, despliegue, cron-job.org y resolución de problemas frecuentes.
 - `output/pdf/Manual_Tecnico_Control_Rondas_Meatex.pdf` y `output/pdf/Guia_Operativa_Control_Rondas_Meatex.pdf`: ediciones PDF de los manuales; regenerar cuando cambie el Markdown correspondiente.
 - `tools/generar_pdf.py`: regenera ambos PDF desde los Markdown; requiere Python 3 y `reportlab`.
+- `tools/crear_superadmin.js`: crea el primer superadmin (requiere `FIREBASE_SERVICE_ACCOUNT`).

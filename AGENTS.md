@@ -44,6 +44,7 @@ public/                 Estáticos servidos en raíz (manifest, SW, iconos, 404)
 api/push.js             Emisor de push serverless
 push-sender/            Emisor alternativo de push para GitHub Actions
 tools/generar_pdf.py    Generador de los PDF de documentación (Python + reportlab)
+tools/crear_superadmin.js  Crea el primer superadmin (requiere firebase-admin y FIREBASE_SERVICE_ACCOUNT)
 tests/unit/             Vitest (entorno node)
 ```
 
@@ -91,7 +92,7 @@ Están congeladas en `tests/validar-reglas.mjs`; si cambiás una, actualizá el 
 
 ## Limitaciones conocidas
 
-- Sin Firebase Auth: la clave del encargado (`admin123`) está en `src/main.js` y las reglas de Firestore son abiertas. Endurecerlas requiere autenticación.
+- Autenticación: Firebase Auth (email/contraseña con email sintético `usuario@rondas.meatex`). El superadmin se crea con `tools/crear_superadmin.js`. Las reglas de Firestore exigen `request.auth != null`. La gestión de usuarios en el panel (Fase 3) aún no está implementada.
 - El Service Worker cachea la navegación y recursos del mismo origen, pero no las importaciones Firebase de `gstatic.com`; no se garantiza arrancar en frío sin red. Los escaneos pueden encolarse en `localStorage` si la app ya está cargada y tiene sus catálogos disponibles.
 - Sin pipeline de CI para el frontend (solo existe `.github/workflows/push-sender.yml`).
 - TTL de Firestore no disponible (facturación deshabilitada); por eso la limpieza es en la app.

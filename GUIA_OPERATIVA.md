@@ -117,18 +117,41 @@ La constante `VAPID_KEY` de `src/main.js` está vacía en la revisión indicada.
 - La app elimina hasta 2.000 registros antiguos al iniciar con conexión. El emisor elimina hasta 1.200 registros por ejecución de limpieza diaria.
 - El nombre del punto es editable; el texto QR se conserva.
 - Desactivar un operador lo oculta del selector; eliminarlo conserva su historial.
-- La clave visual del encargado está en código cliente (`admin123`). No autentica usuarios.
-- Las reglas de Firestore permiten acceso abierto de lectura/escritura a varias colecciones y no hay Firebase Auth. Cualquier cliente que conozca la configuración pública del proyecto puede acceder a esas colecciones. El secreto del cron solo protege `/api/push`; no protege directamente Firestore.
+- La app usa Firebase Authentication (email/contraseña con email sintético `usuario@rondas.meatex`). El primer superadmin se crea con `node tools/crear_superadmin.js <usuario> <contraseña> [nombre]` (requiere `FIREBASE_SERVICE_ACCOUNT`).
+- Las reglas de Firestore exigen `request.auth != null` para todas las colecciones. Los perfiles (`usuarios/{uid}`) solo son legibles por su propio dueño.
+- El superadmin gestiona usuarios y plantas; los gerentes gestionan su planta; los operadores solo escanean QR.
+- No hay auto-registro: solo el superadmin crea usuarios.
 - La cola local de escaneos fallidos usa `localStorage` (`cola_rondas_offline`). La sesión del encargado usa `sessionStorage` (`sesion_encargado`). No hay persistencia local de Firestore ni garantía de arranque en frío sin Internet.
 
-## 7. Archivos de referencia
+## 7. Autenticación (Fase 1)
+
+### Habilitar Firebase Authentication
+
+1. Firebase Console → Authentication → Sign-in method → habilitar **Email/Password**.
+2. Crear el primer superadmin:
+   ```powershell
+   $env:FIREBASE_SERVICE_ACCOUNT = (Get-Content -Raw "C:\ruta\al\serviceAccount.json")
+   node tools/crear_superadmin.js superadmin MiClaveSegura123 "Super Administrador"
+   ```
+3. Desplegar reglas: `firebase deploy --only firestore:rules`.
+
+### Roles
+
+- **Superadmin:** gestión total (plantas, usuarios, contraseñas, datos).
+- **Gerente:** gestión de su planta (puntos, rutas, operadores).
+- **Operador:** escaneo de QR y consulta de agenda.
+
+No hay auto-registro; solo el superadmin crea usuarios.
+
+## 8. Archivos de referencia
 
 - `README.md`: resumen, comandos y reglas principales.
 - `documentacion_control_rondas_meatex.md`: documentación técnica y funcional completa.
 - `firestore.rules`: permisos desplegados en Firestore.
 - `api/push.js`: Function de producción para cron-job.org.
 - `push-sender/index.js` y `.github/workflows/push-sender.yml`: emisor alternativo manual.
-- `src/main.js`: UI y lógica activa de operador/encargado.
+- `src/main.js`: UI y lógica activa de operador/encargado. Incluye Firebase Auth.
+- `tools/crear_superadmin.js`: crea el primer superadmin (requiere `FIREBASE_SERVICE_ACCOUNT`).
 - `src/domain/` y `src/utils/`: reglas puras que se pueden probar sin DOM.
 - `tests/`: validadores de contratos y pruebas unitarias.
 - `tools/generar_pdf.py`: regenera los PDF de `output/pdf/` desde los Markdown (Python 3 + `reportlab`).

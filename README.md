@@ -14,6 +14,8 @@ PWA estática para registrar y auditar rondas de vigilancia mediante códigos QR
 - `push-sender/`: emisor alternativo ejecutable manualmente desde GitHub Actions; usa el secreto `FIREBASE_SERVICE_ACCOUNT`.
 - El encargado puede cambiar el nombre de un punto sin alterar su código QR. Las pestañas separan Puntos de control y Programación de horarios; en esta última se pueden seleccionar varios puntos en el mapa y asignarles los mismos días, hora y tolerancia.
 - `tests/`: validadores estáticos/contractuales y pruebas unitarias Vitest.
+- `tools/crear_superadmin.js`: crea el primer superadmin (requiere `FIREBASE_SERVICE_ACCOUNT`).
+- `tools/generar_pdf.py`: regenera los PDF desde los Markdown (requiere Python 3 y `reportlab`).
 
 ## Documentación
 
@@ -65,6 +67,17 @@ Colecciones principales: `operadores`, `puntos_control`, `rutas_horarias`, `regi
 
 El Service Worker precarga la navegación y guarda recursos del mismo origen después de obtenerlos online. No cachea las importaciones de Firebase servidas desde `gstatic.com` ni habilita persistencia local de Firestore. Por eso no se garantiza abrir o recargar la app sin conexión. Con la app ya cargada y sus catálogos disponibles, los escaneos cuyo envío falla se guardan en `localStorage` y se reintentan al reconectar.
 
+## Autenticación
+
+La app usa **Firebase Authentication** (email/contraseña) con emails sintéticos (`usuario@rondas.meatex`); el usuario solo ingresa su nombre de usuario y contraseña. No hay auto-registro: el superadmin crea los usuarios desde el panel.
+
+Roles:
+- **Superadmin:** gestión total (plantas, usuarios, contraseñas, datos).
+- **Gerente:** gestión de su planta (puntos, rutas, operadores).
+- **Operador:** escaneo de QR y consulta de agenda.
+
+El primer superadmin se crea con `node tools/crear_superadmin.js <usuario> <contraseña> [nombre]` (requiere `FIREBASE_SERVICE_ACCOUNT`). Las reglas de Firestore exigen autenticación (`request.auth != null`).
+
 ## Notificaciones push
 
 Para registrar tokens FCM se debe configurar una clave pública VAPID en `VAPID_KEY` dentro de `src/main.js`; en la revisión del 20 de noviembre de 2026 está vacía. El Service Worker procesa mensajes en segundo plano.
@@ -77,8 +90,9 @@ El emisor automático activo es cron-job.org → Vercel; GitHub Actions se conse
 
 ## Seguridad y limitaciones
 
-- Firestore no usa Firebase Auth y las reglas actuales permiten lectura/escritura abierta en las colecciones incluidas; cualquier cliente puede acceder a esos datos.
-- La clave del encargado (`admin123`) está en el JavaScript del cliente y no constituye autenticación segura.
-- El secreto del endpoint serverless protege la invocación del emisor, pero no reemplaza la autenticación de Firestore.
+- La app usa Firebase Auth para autenticar usuarios. Las reglas de Firestore exigen `request.auth != null` y limitan la lectura de perfiles al propio usuario.
+- El primer superadmin se crea con el script `tools/crear_superadmin.js` (requiere cuenta de servicio). No hay auto-registro.
+- El secreto del endpoint serverless (`CRON_SECRET`) protege la invocación del emisor, pero no reemplaza la autenticación de Firestore.
+- La clave VAPID está vacía por defecto; configurarla para habilitar Web Push.
 - No hay pruebas de integración de navegador. `npm test` ejecuta validadores estáticos/contractuales y pruebas unitarias de módulos puros.
 - La carpeta `dist/` es generada por Vite y no debe editarse a mano.

@@ -1932,20 +1932,29 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
         function agregarCapasBase(mapa) {
             if (!window.L) return;
+            const transparente = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
             const satelite = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 20,
+                maxNativeZoom: 19,
+                errorTileUrl: transparente,
                 attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
             });
             const etiquetas = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
                 maxZoom: 20,
+                maxNativeZoom: 19,
+                errorTileUrl: transparente,
                 attribution: 'Labels &copy; Esri'
             });
             const calles = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 19,
+                maxZoom: 20,
+                maxNativeZoom: 19,
+                errorTileUrl: transparente,
                 attribution: 'Tiles &copy; Esri'
             });
             const osm = window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
+                maxZoom: 20,
+                maxNativeZoom: 19,
+                errorTileUrl: transparente,
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'
             });
             satelite.addTo(mapa);

@@ -3294,14 +3294,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if (notifOk && gpsOk && installOk) {
                 gate.classList.add('hidden');
                 // Mostrar el login siempre después de pasar el gate.
-                const modalLogin = document.getElementById('modal-login-encargado');
-                if (modalLogin) {
-                    modalLogin.classList.remove('hidden');
-                    const sheet = document.getElementById('sheet-login-encargado');
-                    if (sheet) {
-                        sheet.classList.remove('scale-95', 'opacity-0');
-                        sheet.classList.add('scale-100', 'opacity-100');
+                setTimeout(() => {
+                    const modalLogin = document.getElementById('modal-login-encargado');
+                    if (modalLogin) {
+                        modalLogin.classList.remove('hidden');
+                        const sheet = document.getElementById('sheet-login-encargado');
+                        if (sheet) {
+                            sheet.classList.remove('scale-95', 'opacity-0');
+                            sheet.classList.add('scale-100', 'opacity-100');
+                        }
                     }
+                }, 300);
+            } else {
+                // Si no se cumplen los requisitos, informar cuál falta.
+                let falta = '';
+                if (!notifOk) falta = 'notificaciones';
+                else if (!gpsOk) falta = 'ubicación';
+                else if (!installOk) falta = 'instalación de la app';
+                const msg = document.getElementById('gate-mensaje');
+                if (msg) {
+                    msg.textContent = 'Falta habilitar: ' + falta + '. Revisá los permisos.';
+                    msg.classList.remove('hidden');
                 }
             }
         });

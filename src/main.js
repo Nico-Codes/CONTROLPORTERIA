@@ -1984,8 +1984,9 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
             const contenedor = document.getElementById('mapa-puntos-ruta');
             if (!mapaPuntosRutas) {
-                mapaPuntosRutas = window.L.map(contenedor, { scrollWheelZoom: true });
+                mapaPuntosRutas = window.L.map(contenedor, { scrollWheelZoom: true, attributionControl: false });
                 agregarCapasBase(mapaPuntosRutas);
+                window.L.control.attribution({ position: 'bottomright', collapsed: true, prefix: false }).addTo(mapaPuntosRutas);
                 capaPuntosRutas = window.L.featureGroup().addTo(mapaPuntosRutas);
             }
 
@@ -2041,8 +2042,9 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             }
             const contenedor = document.getElementById('mapa-puntos');
             if (!mapaPuntos) {
-                mapaPuntos = window.L.map(contenedor, { scrollWheelZoom: true });
+                mapaPuntos = window.L.map(contenedor, { scrollWheelZoom: true, attributionControl: false });
                 agregarCapasBase(mapaPuntos);
+                window.L.control.attribution({ position: 'bottomright', collapsed: true, prefix: false }).addTo(mapaPuntos);
                 capaPuntos = window.L.featureGroup().addTo(mapaPuntos);
             }
             actualizarMapaPuntos();

@@ -58,6 +58,8 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         let mapaPuntosRutas = null;
         let capaPuntosRutas = null;
         let codigosMapaRutaPendientes = new Set();
+        let mapaPuntos = null;
+        let capaPuntos = null;
 
         function generarCodigoPuntoUnico() {
             let codigo;
@@ -1969,6 +1971,12 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         document.getElementById('modal-mapa-ruta').addEventListener('click', evento => {
             if (evento.target === evento.currentTarget) cerrarModalMapaRuta();
         });
+        const modalMapaPuntos = document.getElementById('modal-mapa-puntos');
+        if (modalMapaPuntos) {
+            modalMapaPuntos.addEventListener('click', evento => {
+                if (evento.target === evento.currentTarget) cerrarModalMapaPuntos();
+            });
+        }
 
         window.confirmarPuntoMapaRuta = () => {
             const puntos = [...codigosMapaRutaPendientes].map(codigo => puntosCache[codigo]).filter(Boolean);
@@ -1979,6 +1987,174 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             elegido.className = 'text-xs font-semibold text-[#0F172A]';
             cerrarModalMapaRuta();
         };
+
+        window.abrirModalMapaPuntos = () => {
+            const modal = document.getElementById('modal-mapa-puntos');
+            if (!modal) return;
+            if (Object.keys(puntosCache).length === 0) {
+                return mostrarAvisoPanel('Primero creá al menos un punto de control.', 'warn');
+            }
+            modal.classList.remove('hidden');
+            actualizarMapaPuntos();
+            if (!window.L) {
+                const aviso = document.getElementById('mapa-puntos-admin-aviso');
+                if (aviso) {
+                    aviso.textContent = 'No se pudo cargar el mapa. Podés ver la lista de puntos en la tabla.';
+                    aviso.classList.remove('hidden');
+                }
+                return;
+            }
+            const contenedor = document.getElementById('mapa-puntos');
+            if (!mapaPuntos) {
+                mapaPuntos = window.L.map(contenedor, { scrollWheelZoom: true });
+                window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'
+                }).addTo(mapaPuntos);
+                capaPuntos = window.L.featureGroup().addTo(mapaPuntos);
+            }
+            actualizarMapaPuntos();
+            requestAnimationFrame(() => {
+                if (!mapaPuntos) return;
+                mapaPuntos.invalidateSize();
+                if (capaPuntos && capaPuntos.getLayers().length > 0) {
+                    mapaPuntos.fitBounds(capaPuntos.getBounds(), { padding: [24, 24], maxZoom: 16 });
+                } else {
+                    mapaPuntos.setView([-32.851, -61.154], 13);
+                }
+            });
+        };
+
+        window.cerrarModalMapaPuntos = () => {
+            const modal = document.getElementById('modal-mapa-puntos');
+            if (modal) modal.classList.add('hidden');
+        };
+
+        function iconoPuntoMapa() {
+            return window.L.divIcon({
+                className: 'marcador-ruta-contenedor',
+                html: '<span class="marcador-ruta"></span>',
+                iconSize: [23, 23],
+                iconAnchor: [11, 23]
+            });
+        }
+
+        window.editarUbicacionPunto = async (id) => {
+            const p = Object.values(puntosCache).find(x => x.id === id);
+            if (!p) return mostrarAvisoPanel('No se encontró el punto de control.', 'error');
+            const lat = prompt(`Nueva latitud para ${p.nombre} (actual: ${p.lat}):`, p.lat);
+            if (lat === null) return;
+            const lng = prompt(`Nueva longitud para ${p.nombre} (actual: ${p.lng}):`, p.lng);
+            if (lng === null) return;
+            const tol = prompt(`Radio permitido en metros (actual: ${p.tolerancia || 25}):`, p.tolerancia || 25);
+            if (tol === null) return;
+            const latNum = Number(lat);
+            const lngNum = Number(lng);
+            const tolNum = Number(tol);
+            if (!Number.isFinite(latNum) || latNum < -90 || latNum > 90) return mostrarAvisoPanel('Latitud inválida.', 'error');
+            if (!Number.isFinite(lngNum) || lngNum < -180 || lngNum > 180) return mostrarAvisoPanel('Longitud inválida.', 'error');
+            if (!Number.isFinite(tolNum) || tolNum < 10 || tolNum > 100) return mostrarAvisoPanel('El radio debe estar entre 10 y 100 m.', 'error');
+            try {
+                await updateDoc(doc(db, 'puntos_control', id), { lat: latNum, lng: lngNum, tolerancia: tolNum });
+                await cargarPuntos();
+                renderizarPuntosAdmin();
+                if (mapaPuntos) actualizarMapaPuntos();
+                mostrarAvisoPanel(`Ubicación de "${p.nombre}" actualizada.`, 'ok');
+            } catch (e) {
+                console.error('[Puntos] Error al editar la ubicación:', e);
+                mostrarAvisoPanel('No se pudo actualizar la ubicación. Revisá la conexión y las reglas de Firestore.', 'error');
+            }
+        };
+
+        function actualizarMapaPuntos() {
+            const lista = document.getElementById('lista-puntos-mapa-admin');
+            if (capaPuntos) capaPuntos.clearLayers();
+            if (lista) lista.replaceChildren();
+            const puntos = Object.values(puntosCache).sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'));
+            const sinCoordenadas = [];
+            puntos.forEach(p => {
+                const boton = document.createElement('button');
+                boton.type = 'button';
+                boton.className = 'w-full text-left px-2.5 py-2 rounded-md border border-[#E2E8F0] hover:border-[#0F172A] hover:bg-slate-50 text-xs transition';
+                boton.textContent = `${p.nombre || 'Punto'} (${p.codigo})${coordenadasValidasPunto(p) ? '' : ' · sin coordenadas'}`;
+                boton.addEventListener('click', () => {
+                    if (!coordenadasValidasPunto(p) || !mapaPuntos || !capaPuntos) return;
+                    const marcador = capaPuntos.getLayers().find(m => m.options.codigoPunto === p.codigo);
+                    if (marcador) {
+                        mapaPuntos.setView(marcador.getLatLng(), Math.max(mapaPuntos.getZoom(), 16));
+                        marcador.openPopup();
+                    }
+                });
+                if (lista) lista.appendChild(boton);
+
+                if (!coordenadasValidasPunto(p)) {
+                    sinCoordenadas.push(p.nombre || p.codigo);
+                    return;
+                }
+                if (!capaPuntos || !window.L) return;
+                const lat = Number(p.lat);
+                const lng = Number(p.lng);
+                const contenido = document.createElement('div');
+                contenido.className = 'space-y-2 text-xs';
+                const titulo = document.createElement('strong');
+                titulo.textContent = p.nombre || 'Punto de control';
+                titulo.className = 'block text-sm text-[#0F172A]';
+                const codigo = document.createElement('div');
+                codigo.className = 'text-slate-500 font-mono-val';
+                codigo.textContent = p.codigo;
+                const coords = document.createElement('div');
+                coords.textContent = `${lat}, ${lng} · radio ${Number(p.tolerancia) || 25} m`;
+                const rutasPt = rutasCache.filter(r => r.codigoQR === p.codigo);
+                const horarios = document.createElement('div');
+                horarios.className = 'text-slate-500';
+                horarios.textContent = rutasPt.length ? `Horarios: ${rutasPt.map(r => `${r.dia} ${r.hora}`).join(', ')}` : 'Sin horarios programados (ronda libre)';
+                const acciones = document.createElement('div');
+                acciones.className = 'flex flex-wrap gap-1.5 pt-1';
+                function botonAccion(texto, clase, onClick) {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'h-7 px-2 rounded border text-xs font-semibold transition ' + clase;
+                    b.textContent = texto;
+                    b.addEventListener('click', onClick);
+                    return b;
+                }
+                acciones.append(
+                    botonAccion('Editar nombre', 'border-[#E2E8F0] bg-white hover:bg-slate-50 text-[#334155]', () => editarNombrePunto(p.id)),
+                    botonAccion('Editar ubicación', 'border-[#E2E8F0] bg-white hover:bg-slate-50 text-[#334155]', () => editarUbicacionPunto(p.id)),
+                    botonAccion('QR', 'border-[#E2E8F0] bg-white hover:bg-slate-50 text-[#334155]', () => abrirModalQRPorId(p.id)),
+                    botonAccion('Eliminar', 'border-red-200 bg-white hover:bg-red-50 text-red-600', () => eliminarPunto(p.id))
+                );
+                contenido.append(titulo, codigo, coords, horarios, acciones);
+
+                const marcador = window.L.marker([lat, lng], {
+                    title: `${p.nombre || 'Punto'} (${p.codigo})`,
+                    alt: `Punto ${p.nombre || p.codigo}`,
+                    codigoPunto: p.codigo
+                });
+                marcador.options.codigoPunto = p.codigo;
+                marcador.setIcon(iconoPuntoMapa());
+                marcador.bindPopup(contenido, { maxWidth: 260 });
+                capaPuntos.addLayer(marcador);
+            });
+
+            const aviso = document.getElementById('mapa-puntos-aviso');
+            if (aviso) {
+                if (sinCoordenadas.length > 0) {
+                    aviso.textContent = `No aparecen en el mapa porque les faltan coordenadas: ${sinCoordenadas.join(', ')}.`;
+                    aviso.classList.remove('hidden');
+                } else {
+                    aviso.textContent = '';
+                    aviso.classList.add('hidden');
+                }
+            }
+            if (mapaPuntos) {
+                if (capaPuntos.getLayers().length > 0) {
+                    mapaPuntos.fitBounds(capaPuntos.getBounds(), { padding: [24, 24], maxZoom: 16 });
+                } else {
+                    mapaPuntos.setView([-32.851, -61.154], 13);
+                }
+            }
+        }
 
         function seleccionarPuntoMapaRuta(codigo) {
             if (codigosMapaRutaPendientes.has(codigo)) codigosMapaRutaPendientes.delete(codigo);
@@ -2229,6 +2405,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 document.getElementById('punto-lng').value = '';
                 await cargarPuntos();
                 renderizarPuntosAdmin();
+                if (mapaPuntos) actualizarMapaPuntos();
                 mostrarMensajeForm('msg-punto', `Punto "${nombre}" creado con código ${codigo}.`, 'ok');
             } catch (e) {
                 console.error('[Puntos] Error al crear punto manual:', e);
@@ -2527,6 +2704,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 await Promise.all([cargarPuntos(), cargarRutas()]);
                 renderizarPuntosAdmin();
                 renderizarRutasAdmin();
+                if (mapaPuntos) actualizarMapaPuntos();
                 if (horariosActualizados) {
                     mostrarAvisoPanel(`Nombre actualizado a "${nombre}". El código ${punto.codigo} se conservó.`, 'ok');
                 } else {
@@ -2555,6 +2733,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 await Promise.all([cargarPuntos(), cargarRutas()]);
                 renderizarPuntosAdmin();
                 renderizarRutasAdmin();
+                if (mapaPuntos) actualizarMapaPuntos();
                 mostrarAvisoPanel(`Punto "${nombre}" eliminado.`, 'ok');
             } catch (e) {
                 console.error('[Puntos] Error al eliminar punto:', e);

@@ -2052,6 +2052,87 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             });
         }
 
+        let cesiumViewer = null;
+        let cesiumCargando = false;
+
+        async function cargarCesium() {
+            if (window.Cesium) return window.Cesium;
+            if (cesiumCargando) {
+                while (!window.Cesium) await new Promise(r => setTimeout(r, 100));
+                return window.Cesium;
+            }
+            cesiumCargando = true;
+            const version = '1.118';
+            const base = `https://cesium.com/downloads/cesiumjs/releases/${version}/Build/Cesium/`;
+            window.CESIUM_BASE_URL = base;
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = base + 'Widgets/widgets.css';
+            document.head.appendChild(link);
+            await new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = base + 'Cesium.js';
+                s.onload = resolve;
+                s.onerror = reject;
+                document.head.appendChild(s);
+            });
+            cesiumCargando = false;
+            return window.Cesium;
+        }
+
+        window.abrirModalCesium = async () => {
+            const modal = document.getElementById('modal-cesium');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            let Cesium;
+            try {
+                Cesium = await cargarCesium();
+            } catch (e) {
+                console.error('[Cesium] No se pudo cargar la librería 3D:', e);
+                mostrarAvisoPanel('No se pudo cargar la vista 3D. Revisá la conexión a Internet.', 'error');
+                cerrarModalCesium();
+                return;
+            }
+            if (!cesiumViewer) {
+                cesiumViewer = new Cesium.Viewer('cesium-container', {
+                    imageryProvider: new Cesium.OpenStreetMapImageryProvider({ url: 'https://tile.openstreetmap.org/' }),
+                    terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+                    baseLayerPicker: false,
+                    animation: false,
+                    timeline: false,
+                    fullscreenButton: false,
+                    geocoder: false,
+                    homeButton: true,
+                    infoBox: true,
+                    sceneModePicker: true,
+                    selectionIndicator: true,
+                    navigationHelpButton: false,
+                    creditContainer: 'cesium-credits'
+                });
+            }
+            cesiumViewer.entities.removeAll();
+            const validos = Object.values(puntosCache).filter(coordenadasValidasPunto);
+            validos.forEach(p => {
+                cesiumViewer.entities.add({
+                    name: p.nombre || 'Punto de control',
+                    position: Cesium.Cartesian3.fromDegrees(Number(p.lng), Number(p.lat)),
+                    point: { pixelSize: 14, color: Cesium.Color.fromCssColorString('#0F172A'), outlineColor: Cesium.Color.WHITE, outlineWidth: 2 },
+                    label: { text: p.nombre || 'Punto', font: '12px sans-serif', fillColor: Cesium.Color.BLACK, style: Cesium.LabelStyle.FILL_AND_OUTLINE, outlineWidth: 2, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -16) }
+                });
+            });
+            if (validos.length > 0) {
+                cesiumViewer.flyTo(cesiumViewer.entities, { duration: 1.5 });
+            } else {
+                cesiumViewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(-61.154, -32.851, 1500000) });
+            }
+            requestAnimationFrame(() => { if (cesiumViewer) cesiumViewer.resize(); });
+        };
+
+        window.cerrarModalCesium = () => {
+            const modal = document.getElementById('modal-cesium');
+            if (modal) modal.classList.add('hidden');
+        };
+
         window.editarUbicacionPunto = async (id) => {
             const p = Object.values(puntosCache).find(x => x.id === id);
             if (!p) return mostrarAvisoPanel('No se encontró el punto de control.', 'error');

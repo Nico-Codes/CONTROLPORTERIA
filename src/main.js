@@ -1928,6 +1928,25 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             document.getElementById('drawer-detalle').classList.add('translate-x-full');
         };
 
+        function agregarCapasBase(mapa) {
+            if (!window.L) return;
+            const calles = window.L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                maxZoom: 20,
+                detectRetina: true,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>'
+            });
+            const satelite = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19,
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+            });
+            calles.addTo(mapa);
+            window.L.control.layers(
+                { 'Calles': calles, 'Satélite': satelite },
+                null,
+                { position: 'topright', collapsed: true }
+            ).addTo(mapa);
+        }
+
         window.abrirModalMapaRuta = () => {
             const modal = document.getElementById('modal-mapa-ruta');
             if (Object.keys(puntosCache).length === 0) {
@@ -1947,10 +1966,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             const contenedor = document.getElementById('mapa-puntos-ruta');
             if (!mapaPuntosRutas) {
                 mapaPuntosRutas = window.L.map(contenedor, { scrollWheelZoom: true });
-                window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'
-                }).addTo(mapaPuntosRutas);
+                agregarCapasBase(mapaPuntosRutas);
                 capaPuntosRutas = window.L.featureGroup().addTo(mapaPuntosRutas);
             }
 
@@ -1959,7 +1975,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             requestAnimationFrame(() => {
                 mapaPuntosRutas.invalidateSize();
                 const bounds = capaPuntosRutas.getBounds();
-                if (bounds.isValid()) mapaPuntosRutas.fitBounds(bounds, { padding: [24, 24], maxZoom: 16 });
+                if (bounds.isValid()) mapaPuntosRutas.fitBounds(bounds, { padding: [24, 24], maxZoom: 18 });
                 else mapaPuntosRutas.setView([-32.851, -61.154], 13);
             });
         };
@@ -2007,10 +2023,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             const contenedor = document.getElementById('mapa-puntos');
             if (!mapaPuntos) {
                 mapaPuntos = window.L.map(contenedor, { scrollWheelZoom: true });
-                window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'
-                }).addTo(mapaPuntos);
+                agregarCapasBase(mapaPuntos);
                 capaPuntos = window.L.featureGroup().addTo(mapaPuntos);
             }
             actualizarMapaPuntos();
@@ -2018,7 +2031,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 if (!mapaPuntos) return;
                 mapaPuntos.invalidateSize();
                 if (capaPuntos && capaPuntos.getLayers().length > 0) {
-                    mapaPuntos.fitBounds(capaPuntos.getBounds(), { padding: [24, 24], maxZoom: 16 });
+                    mapaPuntos.fitBounds(capaPuntos.getBounds(), { padding: [24, 24], maxZoom: 18 });
                 } else {
                     mapaPuntos.setView([-32.851, -61.154], 13);
                 }
@@ -2149,7 +2162,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             }
             if (mapaPuntos) {
                 if (capaPuntos.getLayers().length > 0) {
-                    mapaPuntos.fitBounds(capaPuntos.getBounds(), { padding: [24, 24], maxZoom: 16 });
+                    mapaPuntos.fitBounds(capaPuntos.getBounds(), { padding: [24, 24], maxZoom: 18 });
                 } else {
                     mapaPuntos.setView([-32.851, -61.154], 13);
                 }
@@ -2277,9 +2290,9 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 mapaPuntosRutas.setView(seleccionados[0].getLatLng(), Math.max(mapaPuntosRutas.getZoom(), 15));
             } else if (seleccionados.length > 1) {
                 const grupo = window.L.featureGroup(seleccionados);
-                mapaPuntosRutas.fitBounds(grupo.getBounds(), { padding: [24, 24], maxZoom: 16 });
+                mapaPuntosRutas.fitBounds(grupo.getBounds(), { padding: [24, 24], maxZoom: 18 });
             } else {
-                mapaPuntosRutas.fitBounds(capaPuntosRutas.getBounds(), { padding: [24, 24], maxZoom: 16 });
+                mapaPuntosRutas.fitBounds(capaPuntosRutas.getBounds(), { padding: [24, 24], maxZoom: 18 });
             }
         }
 

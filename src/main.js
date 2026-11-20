@@ -2094,8 +2094,9 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 return;
             }
             if (!cesiumViewer) {
+                Cesium.Ion.defaultAccessToken = '';
                 cesiumViewer = new Cesium.Viewer('cesium-container', {
-                    imageryProvider: new Cesium.OpenStreetMapImageryProvider({ url: 'https://tile.openstreetmap.org/' }),
+                    baseLayer: new Cesium.ImageryLayer(new Cesium.OpenStreetMapImageryProvider({ url: 'https://tile.openstreetmap.org/' })),
                     terrainProvider: new Cesium.EllipsoidTerrainProvider(),
                     baseLayerPicker: false,
                     animation: false,

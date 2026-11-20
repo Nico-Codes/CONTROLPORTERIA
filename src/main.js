@@ -133,6 +133,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             // Listener de autenticación de Firebase. Restaura la sesión al cargar
             // la página y reacciona a cambios (login/logout).
             onAuthStateChanged(auth, async (user) => {
+                console.log('[Auth] onAuthStateChanged fired, user:', user ? user.uid : 'null');
                 if (user) {
                     try {
                         const perfilSnap = await getDoc(doc(db, 'usuarios', user.uid));

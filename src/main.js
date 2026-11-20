@@ -3293,6 +3293,11 @@ document.addEventListener('DOMContentLoaded', () => {
         btnContinuar.addEventListener('click', () => {
             if (notifOk && gpsOk && installOk) {
                 gate.classList.add('hidden');
+                // Mostrar el login si no hay sesión activa.
+                if (!sessionStorage.getItem('usuario_uid')) {
+                    const modalLogin = document.getElementById('modal-login-encargado');
+                    if (modalLogin) modalLogin.classList.remove('hidden');
+                }
             }
         });
     }

@@ -48,17 +48,17 @@ body {
         }
         .marcador-ruta {
             display: block;
-            width: 23px;
-            height: 23px;
+            width: 28px;
+            height: 28px;
             border: 3px solid #FFFFFF;
             border-radius: 50% 50% 50% 0;
-            background: #0F172A;
-            box-shadow: 0 2px 8px #0F172A66;
+            background: linear-gradient(135deg, #1E293B 0%, #0F172A 60%, #020617 100%);
+            box-shadow: 0 4px 12px #0F172A99, 0 1px 3px #00000055, inset 0 1px 2px #FFFFFF33;
             transform: rotate(-45deg);
         }
         .marcador-ruta.seleccionado {
-            background: #059669;
-            box-shadow: 0 0 0 5px #10B98155, 0 2px 8px #0F172A66;
+            background: linear-gradient(135deg, #10B981 0%, #059669 60%, #047857 100%);
+            box-shadow: 0 0 0 5px #10B98155, 0 4px 12px #05966999, 0 1px 3px #00000055, inset 0 1px 2px #FFFFFF33;
         }
         .no-scrollbar::-webkit-scrollbar {
             display: none;

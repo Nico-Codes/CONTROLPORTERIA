@@ -1027,10 +1027,6 @@
                     <h2 id="modal-mapa-ruta-titulo" class="font-semibold text-[#0F172A]">Seleccionar puntos de control</h2>
                     <p class="text-xs text-[#64748B] mt-1">Marcá varios puntos en el mapa o en la lista para programarlos juntos.</p>
                 </div>
-                <button type="button" onclick="abrirModal3D()" class="h-9 px-3.5 bg-[#0F172A] text-white rounded-md text-xs font-semibold flex items-center gap-2 transition shadow-xs">
-                    <i class="fa-solid fa-cube"></i>
-                    <span>Ver en 3D</span>
-                </button>
                 <button type="button" onclick="cerrarModalMapaRuta()" class="w-9 h-9 rounded-lg hover:bg-slate-100 text-[#64748B]" aria-label="Cerrar mapa"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-4 sm:p-6 overflow-y-auto">
@@ -1063,10 +1059,6 @@
                     <h2 id="modal-mapa-puntos-titulo" class="font-semibold text-[#0F172A]">Mapa de puntos de control</h2>
                     <p class="text-xs text-[#64748B] mt-1">Visualizá la ubicación de cada punto y editá su nombre o coordenadas desde el popup.</p>
                 </div>
-                <button type="button" onclick="abrirModal3D()" class="h-9 px-3.5 bg-[#0F172A] text-white rounded-md text-xs font-semibold flex items-center gap-2 transition shadow-xs">
-                    <i class="fa-solid fa-cube"></i>
-                    <span>Ver en 3D</span>
-                </button>
                 <button type="button" onclick="cerrarModalMapaPuntos()" class="w-9 h-9 rounded-lg hover:bg-slate-100 text-[#64748B]" aria-label="Cerrar mapa"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="p-4 sm:p-6 overflow-y-auto">
@@ -1082,15 +1074,6 @@
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- VISTA 3D (MAPLIBRE) -->
-    <div id="modal-mapa-3d" class="hidden fixed inset-0 z-[80] bg-slate-950 flex flex-col" role="dialog" aria-modal="true" aria-labelledby="modal-mapa-3d-titulo">
-        <div class="flex items-center justify-between gap-4 px-4 py-3 bg-slate-900 text-white">
-            <h2 id="modal-mapa-3d-titulo" class="font-semibold text-sm">Vista 3D de puntos de control</h2>
-            <button type="button" onclick="cerrarModal3D()" class="w-9 h-9 rounded-lg hover:bg-slate-800 text-white/80" aria-label="Cerrar vista 3D"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <div id="mapa-3d-container" class="flex-1"></div>
     </div>
 
     <!-- FOOTER CORPORATIVO (SOLO ENCARGADO) -->

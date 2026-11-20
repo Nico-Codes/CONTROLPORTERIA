@@ -127,13 +127,20 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             document.getElementById('op-skeleton').classList.add('hidden');
             document.getElementById('op-contenido').classList.remove('hidden');
 
+            // Mostrar el login de inmediato si no hay sesión; el listener de auth
+            // lo ocultará si se restaura una sesión válida.
+            if (!sessionStorage.getItem('usuario_uid')) {
+                const modalLogin = document.getElementById('modal-login-encargado');
+                if (modalLogin) modalLogin.classList.remove('hidden');
+            }
+
             refrescarVistaOperador();
             iniciarMotorAlertasOperador();
 
             // Listener de autenticación de Firebase. Restaura la sesión al cargar
             // la página y reacciona a cambios (login/logout).
-            onAuthStateChanged(auth, async (user) => {
-                console.log('[Auth] onAuthStateChanged fired, user:', user ? user.uid : 'null');
+            onAuthStateChanged(auth, (user) => {
+                (async () => {
                 if (user) {
                     try {
                         const perfilSnap = await getDoc(doc(db, 'usuarios', user.uid));
@@ -183,6 +190,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                     const modalLogin = document.getElementById('modal-login-encargado');
                     if (modalLogin) modalLogin.classList.remove('hidden');
                 }
+                })();
             });
         });
 

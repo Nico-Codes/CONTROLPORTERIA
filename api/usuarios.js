@@ -4,8 +4,7 @@ const { randomBytes } = require('crypto');
 const AJUSTES_PUSH_POR_DEFECTO = {
     activo: true,
     minutosAvisoPrevio: 8,
-    minutosAvisoVencimiento: 5,
-    repeticionIncumplimientoMinutos: 60
+    minutosAvisoVencimiento: 5
 };
 
 function cargarCredencial() {
@@ -140,11 +139,12 @@ module.exports = async function (req, res) {
             const { ajustes } = req.body || {};
             const camposValidos = ajustes && typeof ajustes.activo === 'boolean'
                 && Number.isInteger(ajustes.minutosAvisoPrevio) && ajustes.minutosAvisoPrevio >= 2 && ajustes.minutosAvisoPrevio <= 60
-                && Number.isInteger(ajustes.minutosAvisoVencimiento) && ajustes.minutosAvisoVencimiento >= 1 && ajustes.minutosAvisoVencimiento <= 30
-                && Number.isInteger(ajustes.repeticionIncumplimientoMinutos) && ajustes.repeticionIncumplimientoMinutos >= 5 && ajustes.repeticionIncumplimientoMinutos <= 1440;
+                && Number.isInteger(ajustes.minutosAvisoVencimiento) && ajustes.minutosAvisoVencimiento >= 1 && ajustes.minutosAvisoVencimiento <= 30;
             if (!camposValidos) return res.status(400).json({ error: 'Revisá los valores de notificaciones y sus límites.' });
             await db.collection('config').doc('push_settings').set({
-                ...ajustes,
+                activo: ajustes.activo,
+                minutosAvisoPrevio: ajustes.minutosAvisoPrevio,
+                minutosAvisoVencimiento: ajustes.minutosAvisoVencimiento,
                 actualizadoEn: admin.firestore.FieldValue.serverTimestamp(),
                 actualizadoPor: sesion.uid
             }, { merge: true });

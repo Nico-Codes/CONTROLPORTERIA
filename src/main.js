@@ -1948,7 +1948,6 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 document.getElementById('ajuste-notificaciones-activo').checked = ajustes.activo !== false;
                 document.getElementById('ajuste-minutos-aviso-previo').value = ajustes.minutosAvisoPrevio ?? 8;
                 document.getElementById('ajuste-minutos-aviso-vencimiento').value = ajustes.minutosAvisoVencimiento ?? 5;
-                document.getElementById('ajuste-repeticion-incumplimiento').value = ajustes.repeticionIncumplimientoMinutos ?? 60;
                 mostrarAvisoAdministracion('Configuración actualizada.');
             } catch (error) {
                 mostrarAvisoAdministracion(error.message, true);
@@ -1990,8 +1989,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             const ajustes = {
                 activo: document.getElementById('ajuste-notificaciones-activo').checked,
                 minutosAvisoPrevio: Number(document.getElementById('ajuste-minutos-aviso-previo').value),
-                minutosAvisoVencimiento: Number(document.getElementById('ajuste-minutos-aviso-vencimiento').value),
-                repeticionIncumplimientoMinutos: Number(document.getElementById('ajuste-repeticion-incumplimiento').value)
+                minutosAvisoVencimiento: Number(document.getElementById('ajuste-minutos-aviso-vencimiento').value)
             };
             try {
                 await llamarApiUsuarios({ accion: 'guardar_ajustes_push', ajustes });

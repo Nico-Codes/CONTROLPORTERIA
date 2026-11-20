@@ -95,6 +95,8 @@ El emisor automático activo es cron-job.org → Vercel; GitHub Actions se conse
 2. La función `api/push.js` requiere las variables de entorno `FIREBASE_SERVICE_ACCOUNT` y `CRON_SECRET` en Vercel. Acepta `GET` y `POST`; ambos métodos requieren el encabezado de autorización.
 3. GitHub Actions conserva una ejecución manual alternativa; su workflow solo se activa con `workflow_dispatch` y no tiene programación automática.
 
+El aviso de incumplimiento se envía una sola vez, al vencer la hora programada más la tolerancia de la ruta. Llega en la primera ejecución de cron-job.org posterior al vencimiento; no se repite.
+
 ## Seguridad y limitaciones
 
 - La app usa Firebase Auth para autenticar usuarios. Las reglas de Firestore exigen `request.auth != null` y limitan la lectura de perfiles al propio usuario.

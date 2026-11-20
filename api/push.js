@@ -79,8 +79,8 @@ async function enviarProactivos(db, messaging, tokens, plantaId, ajustes) {
         if (diffMin <= -(previo - 1) && diffMin >= -(previo + 1)) grupoPrevio.push(ruta);
 
         const minParaFin = margen - diffMin;
-        if (diffMin > 0 && minParaFin <= (Number(ajustes.minutosAvisoVencimiento) || 5) && minParaFin >= 0) grupoVence.push(ruta);
-        else if (diffMin > margen && !huboEscaneo(regsHoy, ruta)) grupoIncumplido.push(ruta);
+        if (diffMin > 0 && minParaFin <= (Number(ajustes.minutosAvisoVencimiento) || 5) && minParaFin > 0) grupoVence.push(ruta);
+        else if (ahora.getTime() >= obj.getTime() + margen * 60000 && !huboEscaneo(regsHoy, ruta)) grupoIncumplido.push(ruta);
     }
 
     const alertasRef = db.collection('config').doc(`push_alertas_${plantaId}`);
@@ -88,15 +88,29 @@ async function enviarProactivos(db, messaging, tokens, plantaId, ajustes) {
     const alertas = alertasSnap.exists ? (alertasSnap.data() || {}) : {};
     const nowMs = Date.now();
 
-    const cooldowns = { lote_8m: 15 * 60 * 1000, lote_3m: 10 * 60 * 1000, lote_inc: (Number(ajustes.repeticionIncumplimientoMinutos) || 60) * 60 * 1000 };
+    const cooldowns = { lote_8m: 15 * 60 * 1000, lote_3m: 10 * 60 * 1000 };
 
     async function enviarGrupo(grupo, cooldownKey, titulo, bodyFn, severidad, tag) {
         const tokensPlanta = tokens.filter(d => Array.isArray(d.plantas) && (d.plantas.includes('*') || d.plantas.includes(plantaId))).map(d => d.token).filter(Boolean);
         if (grupo.length === 0 || tokensPlanta.length === 0) return;
+        if (cooldownKey === 'lote_inc') {
+            const pendientes = await db.runTransaction(async tx => {
+                const snap = await tx.get(alertasRef);
+                const data = snap.exists ? snap.data() : {};
+                const prefijoHoy = `${hoyISO}_`;
+                const enviadosHoy = Object.fromEntries(Object.entries(data.incumplimientosEnviados || {}).filter(([clave]) => clave.startsWith(prefijoHoy)));
+                const nuevas = grupo.filter(ruta => !enviadosHoy[`${hoyISO}_${ruta.id}`]);
+                nuevas.forEach(ruta => { enviadosHoy[`${hoyISO}_${ruta.id}`] = nowMs; });
+                if (nuevas.length) tx.set(alertasRef, { ...data, incumplimientosEnviados: enviadosHoy });
+                return nuevas;
+            });
+            if (!pendientes.length) return;
+            grupo = pendientes;
+        }
         const hash = grupo.map(r => r.codigoQR + '@' + r.hora).sort().join(',');
         const key = `${cooldownKey}_${hash}`;
         const last = alertas[key] || 0;
-        if (nowMs - last < cooldowns[cooldownKey]) return;
+        if (cooldownKey !== 'lote_inc' && nowMs - last < cooldowns[cooldownKey]) return;
 
         const cant = grupo.length;
         const body = bodyFn(cant);
@@ -107,8 +121,10 @@ async function enviarProactivos(db, messaging, tokens, plantaId, ajustes) {
                 android: { priority: 'high' },
                 webpush: { headers: { Urgency: 'high' } }
             });
-            alertas[key] = nowMs;
-            await alertasRef.set(alertas, { merge: true });
+            if (cooldownKey !== 'lote_inc') {
+                alertas[key] = nowMs;
+                await alertasRef.set(alertas, { merge: true });
+            }
             console.log(`[Push] Enviado "${titulo}" para ${grupo.length} ruta(s).`);
         } catch (err) {
             console.error('Error enviando push proactivo:', err.message);

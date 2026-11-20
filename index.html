@@ -617,17 +617,15 @@
                         <span>Notificaciones activas</span>
                         <input id="ajuste-notificaciones-activo" type="checkbox" class="h-4 w-4 accent-slate-900">
                     </label>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                         <label class="text-xs text-[#475569]">Aviso previo (min)
                             <input id="ajuste-minutos-aviso-previo" type="number" min="2" max="60" class="mt-1 h-10 w-full border border-[#E2E8F0] rounded-md px-3 text-sm text-[#0F172A]">
                         </label>
                         <label class="text-xs text-[#475569]">Antes del vencimiento (min)
                             <input id="ajuste-minutos-aviso-vencimiento" type="number" min="1" max="30" class="mt-1 h-10 w-full border border-[#E2E8F0] rounded-md px-3 text-sm text-[#0F172A]">
                         </label>
-                        <label class="text-xs text-[#475569]">Repetir incumplimiento (min)
-                            <input id="ajuste-repeticion-incumplimiento" type="number" min="5" max="1440" class="mt-1 h-10 w-full border border-[#E2E8F0] rounded-md px-3 text-sm text-[#0F172A]">
-                        </label>
                     </div>
+                    <p class="mt-3 text-xs text-[#64748B]">El incumplimiento se notifica una sola vez al vencer el horario y su tolerancia.</p>
                     <button type="button" onclick="guardarAjustesNotificaciones()" class="mt-4 h-10 px-4 bg-[#0F172A] text-white rounded-md text-xs font-semibold">Guardar ajustes</button>
                 </section>
             </div>

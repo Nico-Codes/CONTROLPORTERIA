@@ -22,6 +22,9 @@ function listarArchivosJs(directorio) {
 const archivosJs = listarArchivosJs(resolve(raiz, 'src'));
 const codigo = html + '\n' + archivosJs.map(archivo => readFileSync(archivo, 'utf8')).join('\n');
 const reglas = readFileSync(resolve(raiz, 'firestore.rules'), 'utf8');
+const emisorAlternativo = readFileSync(resolve(raiz, 'push-sender/index.js'), 'utf8');
+const emisorVercel = readFileSync(resolve(raiz, 'api/push.js'), 'utf8');
+const apiUsuarios = readFileSync(resolve(raiz, 'api/usuarios.js'), 'utf8');
 
 const fallas = [];
 const ok = [];
@@ -55,6 +58,12 @@ comprobar('El escaneo prioriza la ruta pendiente más temprana', contiene('const
 // Panel
 comprobar('Los KPIs usan el cache del día seleccionado', contiene('const regsDia = registrosAdminCache.filter(r => r.fechaISO === fechaFiltro);'));
 comprobar('Cada bloque del panel se renderiza aislado', contiene("console.error(`[Panel] Error al renderizar ${nombre}:`, e);"));
+comprobar('La pestaña de usuarios solo se muestra al superadmin', contiene("tabUsuarios.style.display = habilitado ? 'flex' : 'none';") && contiene("const habilitado = rol === 'superadmin';"));
+comprobar('La administración solo aparece y responde al superadmin', contiene('id="tab-administracion"') && contiene("tabAdministracion.style.display = esSuperadmin ? 'flex' : 'none';") && contiene("sessionStorage.getItem('usuario_rol') !== 'superadmin') return;"));
+comprobar('El superadmin puede crear y deshabilitar plantas', apiUsuarios.includes("accion === 'crear_planta'") && apiUsuarios.includes("accion === 'estado_planta'") && contiene('window.crearPlantaSistema'));
+comprobar('Los ajustes globales controlan ambos emisores', apiUsuarios.includes("accion === 'guardar_ajustes_push'") && emisorVercel.includes("doc('push_settings')") && emisorAlternativo.includes("doc('push_settings')") && emisorVercel.includes('if (!notificacionesActivas) continue;') && emisorAlternativo.includes('if (!notificacionesActivas) continue;'));
+comprobar('Los accesos registran ubicación aproximada y protegen su colección', apiUsuarios.includes("accion === 'registrar_acceso'") && apiUsuarios.includes("'x-vercel-ip-city'") && reglas.includes('match /auditoria_accesos/{doc}') && reglas.includes('allow read, write: if false;'));
+comprobar('El login es una vista opaca e independiente', html.includes('z-[100] min-h-screen overflow-y-auto bg-[#F7F7F5]') && contiene("modal.style.display = 'flex';") && contiene('const esOperadorAutenticado = tieneSesion && !esEncargado;'));
 comprobar('No quedan IDs inexistentes del bug original', !contiene('badge-criticos-tab') && !contiene('bar-validos') && !contiene('bar-adv') && !contiene('bar-crit'));
 
 // Operadores
@@ -64,9 +73,9 @@ comprobar('Eliminar operador pide confirmación', contiene('if (!confirm(`¿Elim
 
 // Puntos y rutas
 comprobar('Eliminar punto pide confirmación', contiene('if (!confirm(aviso)) return;'));
-comprobar('Eliminar punto borra sus rutas en lote', contiene('rutasAsociadas.forEach(r => batch.delete(doc(db, "rutas_horarias", r.id)));'));
+comprobar('Eliminar punto borra sus rutas en lote', contiene('rutasAsociadas.forEach(r => batch.delete(doc(db, "plantas", plantaActiva, "rutas_horarias", r.id)));'));
 comprobar('No se permiten nombres de punto duplicados', contiene('if (existePuntoConNombre(nombre))'));
-comprobar('Editar un punto solo modifica su nombre', contiene('updateDoc(doc(db, "puntos_control", id), { nombre });'));
+comprobar('Editar un punto solo modifica su nombre', contiene('updateDoc(doc(db, "plantas", plantaActiva, "puntos_control", id), { nombre });'));
 comprobar('Editar el punto conserva su código QR y evita nombres duplicados', contiene('existePuntoConNombre(nombre, punto.codigo)'));
 comprobar('Los horarios asociados reciben el nuevo nombre', contiene('lote.update(ruta.ref, { puntoNombre: nombre })'));
 comprobar('La programación permite elegir puntos desde el mapa', contiene('window.abrirModalMapaRuta'));
@@ -85,11 +94,14 @@ comprobar('La exportación respeta 60 días desde hoy', contiene('const corte = 
 
 // Reglas de Firestore
 comprobar('firestore.rules versiona las reglas', reglas.includes("rules_version = '2';"));
-comprobar('Las reglas permiten crear registros', /match \/registros_ronda\/\{doc\} \{[\s\S]*allow read, create, delete: if request\.auth != null;/.test(reglas));
+comprobar('Las reglas limitan el acceso a plantas asignadas', reglas.includes('function perteneceAPlanta(plantaId)') && reglas.includes('plantaId in perfil().plantas'));
+comprobar('Los registros solo se crean en una planta asignada', /match \/registros_ronda\/\{doc\} \{[\s\S]*allow create: if perteneceAPlanta\(plantaId\);/.test(reglas));
 comprobar('Las reglas niegan la modificación de registros', /allow update: if false;/.test(reglas));
 comprobar('La app limpia registros de más de 60 días', contiene('async function limpiarRegistrosAntiguos()'));
 comprobar('La limpieza usa lotes de 400 registros', contiene('limit(400)'));
 comprobar('Las reglas incluyen dispositivos_notificaciones', reglas.includes('match /dispositivos_notificaciones/{doc}'));
+comprobar('El emisor alternativo procesa datos por planta', emisorAlternativo.includes("collection('plantas').doc(plantaId).collection('rutas_horarias')") && emisorAlternativo.includes("collectionGroup('registros_ronda')"));
+comprobar('El emisor alternativo filtra tokens por planta', emisorAlternativo.includes('d.plantas.includes(plantaId)') && emisorAlternativo.includes('d.plantas.includes(\'*\')'));
 
 for (const nombre of ok) console.log(`OK  ${nombre}`);
 if (fallas.length > 0) {

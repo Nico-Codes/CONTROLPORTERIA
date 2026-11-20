@@ -73,7 +73,9 @@ No incluir el secreto en la URL ni en el nombre público de la tarea. La frecuen
 
 El workflow `.github/workflows/push-sender.yml` puede ejecutarse manualmente desde GitHub Actions. Requiere el secreto de repositorio `FIREBASE_SERVICE_ACCOUNT`. No activar otro cron automático para ese workflow mientras cron-job.org esté enviando notificaciones.
 
-Los emisores tienen ventanas de alertas proactivas diferentes. La Function de Vercel avisa antes de la ruta entre 3 y 12 minutos y cerca del vencimiento dentro de los últimos 5 minutos; el emisor manual de GitHub usa entre 7 y 9 minutos y los últimos 3 minutos. Ambos procesan incidencias recientes y mantienen cursores/cooldowns en Firestore.
+El superadmin puede cambiar en **Administración** si se envían push, cuántos minutos antes avisar, el umbral antes del vencimiento y la repetición de incumplimientos. Los valores se guardan en `config/push_settings` y ambos emisores los consultan en cada ejecución. Al apagar los avisos se avanza el cursor para no entregar incidencias acumuladas al volver a activarlos; la limpieza de retención continúa.
+
+La ubicación de los accesos recientes se estima con los encabezados geográficos de Vercel; puede no estar disponible o ser imprecisa, y no utiliza GPS. Se guardan los últimos 100 accesos y los registros con más de 90 días se limpian al siguiente inicio de sesión.
 
 ## 4. Diagnóstico de notificaciones
 

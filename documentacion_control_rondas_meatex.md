@@ -70,7 +70,7 @@ Roles:
 - **Gerente:** gestión de su planta (puntos, rutas, operadores).
 - **Operador:** escaneo de QR y consulta de agenda.
 
-No hay auto-registro: el superadmin crea los usuarios con `tools/crear_superadmin.js` (o el panel, en fases posteriores).
+No hay auto-registro: el superadmin crea el primer acceso con `tools/crear_superadmin.js` y administra gerentes/operadores desde **Usuarios del sistema**. En **Administración** puede crear y habilitar/deshabilitar plantas, configurar las notificaciones push y consultar accesos recientes.
 
 ## 4. Reglas de rondas
 
@@ -94,7 +94,8 @@ La distancia GPS se calcula con Haversine. El radio predeterminado es 25 m cuand
 | `operadores` | Nombre, legajo, turno y estado activo. Desactivar conserva el documento y el historial; eliminar al operador no borra sus registros. |
 | `registros_ronda` | Operador, QR/punto, fecha/hora, coordenadas, distancia, tolerancia, ruta aplicada, margen, estado, severidad y fechas de creación/expiración. El cliente crea y lee registros; las reglas niegan su actualización y permiten su borrado para retención. |
 | `dispositivos_notificaciones` | Token FCM, rol, fecha de alta y datos asociados al dispositivo. |
-| `config` | Cursor de registros procesados, marcas de limpieza y cooldowns de notificaciones proactivas. |
+| `config` | Cursor de registros procesados, marcas de limpieza, cooldowns y ajustes globales en `push_settings`. |
+| `auditoria_accesos` | Accesos recientes con usuario, rol, plantas, dispositivo y ubicación aproximada por IP; solo API Admin SDK. |
 
 Los nuevos registros incluyen `timestampMs`, `fechaISO`, `rutaId`, `diaRuta`, `margen`, `tolerancia`, `creadoEn` y `expiraEn`. El historial conserva el margen y la tolerancia aplicados cuando se produjo el escaneo.
 
@@ -118,7 +119,7 @@ No hay TTL de Firestore configurado. La limpieza en cliente y emisor requiere pe
 
 El Service Worker precarga rutas/recursos del mismo origen y aplica network-first a navegación; otros recursos del mismo origen se cachean tras una respuesta exitosa. Ignora solicitudes a otros orígenes, incluidas las importaciones de Firebase desde `gstatic.com`.
 
-Si Firestore rechaza o no puede completar el envío de un registro, el cliente guarda el objeto en `localStorage` bajo `cola_rondas_offline` y reintenta al recibir el evento `online`. Las fechas se reconstruyen antes de reenviar.
+Si Firestore rechaza o no puede completar el envío de un registro, el cliente guarda el objeto en `localStorage` bajo `cola_rondas_offline` junto con el ID de la planta de origen y reintenta en esa misma planta al recibir el evento `online`. Las fechas se reconstruyen antes de reenviar.
 
 Esto no equivale a soporte offline completo: no se configura persistencia local de Firestore, los recursos CDN de Firebase no se cachean y una apertura en frío sin red no está garantizada. Para escanear sin red la app debe estar cargada y tener los catálogos necesarios disponibles en memoria.
 
@@ -133,23 +134,29 @@ Los emisores ejecutan dos grupos de trabajo: alertas proactivas de rutas próxim
 - **cron-job.org → Vercel Function (emisor principal):** cron-job.org llama `GET https://controlporteria.vercel.app/api/push` según el intervalo configurado. Debe enviar `Authorization: Bearer <CRON_SECRET>`. Vercel requiere las variables `FIREBASE_SERVICE_ACCOUNT` y `CRON_SECRET`. La función acepta GET y POST; otros métodos devuelven 405, secreto faltante 503 y autorización inválida 401. La cuenta de servicio acepta JSON o JSON codificado en Base64.
 - **GitHub Actions (alternativa manual):** `.github/workflows/push-sender.yml` solo se ejecuta con `workflow_dispatch`; no tiene cron automático. Lee el secreto `FIREBASE_SERVICE_ACCOUNT` y ejecuta `push-sender/`.
 
-El emisor de Vercel agrupa avisos previos cuando faltan de 3 a 12 minutos, avisos próximos al vencimiento dentro de los últimos 5 minutos y alertas de incumplimiento después del margen. El emisor alternativo de GitHub usa ventanas distintas: aviso previo entre 7 y 9 minutos y aviso de vencimiento dentro de los últimos 3 minutos. Ambos limpian como máximo tres lotes de 400 registros por ejecución diaria. Mantener un solo emisor automático evita duplicados; la ejecución manual de GitHub también puede coincidir con cron-job.org.
+Los ajustes del panel **Administración** se guardan en `config/push_settings` y se aplican a ambos emisores: encender/apagar avisos, minutos del aviso previo, minutos antes del vencimiento y repetición de incumplimientos. Si se apagan, ambos emisores avanzan el cursor sin entregar avisos acumulados; la limpieza de retención sigue activa. Mantener un solo emisor automático evita duplicados; la ejecución manual de GitHub también puede coincidir con cron-job.org.
 
-Los emisores calculan la fecha/hora operativa con un desplazamiento fijo UTC-3. Si cambia la zona horaria de operación o sus reglas, debe revisarse esta conversión en ambos emisores.
+Los emisores procesan rutas y registros dentro de cada planta y limitan los avisos a tokens FCM con esa planta asignada. Los tokens se actualizan al iniciar sesión. Ambos emisores calculan la fecha/hora operativa con un desplazamiento fijo UTC-3.
 
 No se deben ejecutar ambos emisores simultáneamente sin evaluar duplicados y cooldowns compartidos.
 
 ## 10. Seguridad y privacidad
 
-La app usa **Firebase Authentication** (email/contraseña). Las reglas de Firestore exigen `request.auth != null` para todas las colecciones. Los perfiles de usuario (`usuarios/{uid}`) solo son legibles por su propio dueño; su escritura está denegada desde el cliente (solo Admin SDK).
+La app usa **Firebase Authentication** (email/contraseña). Los perfiles de usuario (`usuarios/{uid}`) solo son legibles por su propio dueño; su escritura está denegada desde el cliente. Las reglas comprueban que el perfil esté activo y que el usuario pertenezca a `plantas/{plantaId}`. Solo gerentes y superadmins pueden modificar catálogos; los registros de ronda no se pueden actualizar.
 
 El endpoint serverless usa `CRON_SECRET` para limitar invocaciones. Esto protege ese endpoint, pero no reemplaza la autenticación de Firestore. La cuenta de servicio debe guardarse únicamente en secretos de GitHub/Vercel y nunca en el frontend.
 
-El primer superadmin se crea con `tools/crear_superadmin.js` (requiere `FIREBASE_SERVICE_ACCOUNT`). No hay auto-registro.
+El primer superadmin se crea con `tools/crear_superadmin.js` (requiere `FIREBASE_SERVICE_ACCOUNT`). No hay auto-registro. El superadmin gestiona cuentas desde el panel a través de `/api/usuarios`, una función protegida por ID token que usa `FIREBASE_SERVICE_ACCOUNT`. Los gerentes no pueden gestionar usuarios.
+
+La misma API permite al superadmin crear plantas (quedan inicialmente sin catálogos ni usuarios asignados), activar/desactivar plantas y ajustar notificaciones. Los accesos se registran al autenticar: fecha, nombre de usuario, rol, planta(s), dispositivo y ubicación aproximada. Vercel deriva los campos de ciudad, región y país de la IP; la ubicación no es GPS y puede resultar imprecisa. No se almacena la IP ni el agente de usuario completo. Se muestran hasta 100 accesos y al iniciar sesión se eliminan hasta 100 registros con más de 90 días. Las reglas de Firestore bloquean el acceso directo a `auditoria_accesos` y la edición directa de `config`; las operaciones pasan por la API.
+
+## 11. Multi-planta y migración
+
+Los catálogos y registros operativos se guardan en `plantas/{plantaId}/{colección}`. El selector del panel aparece cuando el usuario tiene más de una planta asignada. El script `tools/migrar_planta.js <plantaId> <nombre> [--dry-run]` copia `puntos_control`, `operadores`, `rutas_horarias` y `registros_ronda` desde las colecciones top-level; nunca borra el origen y divide los lotes para respetar los límites de Firestore. Revisar el resultado antes de borrar manualmente los datos anteriores.
 
 La selección de operador no verifica identidad. Desactivar un operador lo oculta de la vista/selector; eliminarlo no elimina su historial de escaneos.
 
-## 11. Instalación y despliegue
+## 12. Instalación y despliegue
 
 ```bash
 npm install
@@ -161,20 +168,18 @@ npm test
 
 Vite usa `index.html` en la raíz y genera `dist/`. Vercel sirve ese directorio y la función `api/push.js`; el proyecto está conectado a GitHub para desplegar la rama `main`. Firebase Hosting está configurado para redirigir `/` y `/index.html` a `https://controlporteria.vercel.app/`. Las reglas se despliegan por separado con `firebase deploy --only firestore:rules`. Consultar `GUIA_OPERATIVA.md` para configuración y diagnóstico de despliegue y cron.
 
-## 12. Pruebas
+## 13. Pruebas
 
 `npm test` ejecuta `tests/validar-index.mjs`, `tests/validar-reglas.mjs` y Vitest sobre `tests/unit/`. Hay pruebas unitarias para rondas, geografía y formato. Los validadores estáticos comprueban patrones del HTML/JavaScript y contratos de negocio; no prueban el navegador real, Firestore remoto, permisos móviles ni la entrega de push.
 
-## 13. Limitaciones conocidas
+## 14. Limitaciones conocidas
 
-- La autenticación usa Firebase Auth con emails sintéticos (`usuario@rondas.meatex`). La gestión de usuarios (Fase 3) aún no está implementada en el panel; se crea el superadmin por script.
-- El multi-planta (Fase 2) aún no está implementado; los datos siguen en colecciones top-level.
 - La clave VAPID está vacía por defecto.
 - La app no garantiza arranque offline ni persistencia local de Firestore.
 - Los emisores y la app dependen de servicios externos/CDN y conectividad para sincronizar.
 - No existen pruebas de extremo a extremo en navegador.
 
-## 14. Documentos de mantenimiento
+## 15. Documentos de mantenimiento
 
 - `README.md`: presentación breve, reglas principales y comandos de desarrollo.
 - `documentacion_control_rondas_meatex.md`: arquitectura, flujos, modelo de datos, seguridad, retención, push y pruebas.

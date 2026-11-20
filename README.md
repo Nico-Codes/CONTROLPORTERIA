@@ -11,10 +11,11 @@ PWA estática para registrar y auditar rondas de vigilancia mediante códigos QR
 - `public/`: manifest, iconos, Service Worker FCM y 404.
 - `firestore.rules`: reglas versionadas de Firestore.
 - `api/push.js`: endpoint de push para Vercel; requiere `CRON_SECRET` y `FIREBASE_SERVICE_ACCOUNT`.
-- `push-sender/`: emisor alternativo ejecutable manualmente desde GitHub Actions; usa el secreto `FIREBASE_SERVICE_ACCOUNT`.
+- `push-sender/`: emisor alternativo de GitHub Actions; procesa colecciones y destinatarios por planta.
 - El encargado puede cambiar el nombre de un punto sin alterar su código QR. Las pestañas separan Puntos de control y Programación de horarios; en esta última se pueden seleccionar varios puntos en el mapa y asignarles los mismos días, hora y tolerancia.
 - `tests/`: validadores estáticos/contractuales y pruebas unitarias Vitest.
 - `tools/crear_superadmin.js`: crea el primer superadmin (requiere `FIREBASE_SERVICE_ACCOUNT`).
+- `tools/migrar_planta.js`: copia las colecciones actuales a `plantas/{plantaId}`; acepta `--dry-run`.
 - `tools/generar_pdf.py`: regenera los PDF desde los Markdown (requiere Python 3 y `reportlab`).
 
 ## Documentación
@@ -76,7 +77,13 @@ Roles:
 - **Gerente:** gestión de su planta (puntos, rutas, operadores).
 - **Operador:** escaneo de QR y consulta de agenda.
 
-El primer superadmin se crea con `node tools/crear_superadmin.js <usuario> <contraseña> [nombre]` (requiere `FIREBASE_SERVICE_ACCOUNT`). Las reglas de Firestore exigen autenticación (`request.auth != null`).
+El primer superadmin se crea con `node tools/crear_superadmin.js <usuario> <contraseña> [nombre]` (requiere `FIREBASE_SERVICE_ACCOUNT`).
+
+## Multi-planta y usuarios
+
+Los catálogos y registros se guardan en `plantas/{plantaId}/{colección}`. Tras revisar un `--dry-run`, migrá los datos actuales con `node tools/migrar_planta.js carcarana2 "Meatex Carcaraña 2"`; la herramienta copia los documentos y conserva las colecciones de origen. Superadmins y gerentes con varias asignaciones pueden cambiar de planta desde el panel. Firestore limita el acceso a las plantas asignadas al perfil.
+
+El superadmin administra cuentas desde **Usuarios del sistema** y plantas, ajustes de notificaciones y accesos recientes desde **Administración**. La API `/api/usuarios` requiere un ID token de Firebase y la cuenta de servicio de Vercel; solo el superadmin puede realizar estas acciones. Los gerentes no pueden crear usuarios ni cambiar la configuración global.
 
 ## Notificaciones push
 

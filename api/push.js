@@ -45,12 +45,12 @@ function huboEscaneo(regsHoy, ruta) {
     );
 }
 
-async function enviarProactivos(db, messaging, tokens) {
+async function enviarProactivos(db, messaging, tokens, plantaId, ajustes) {
     const ahora = ahoraArgentina();
     const hoyISO = fechaISOArgentina(ahora);
     const hoyNombre = DIAS_SEMANA[ahora.getUTCDay()];
 
-    const rutasSnap = await db.collection('rutas_horarias').get();
+    const rutasSnap = await db.collection('plantas').doc(plantaId).collection('rutas_horarias').get();
     const rutasHoy = rutasSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(r => r.dia === hoyNombre || r.dia === 'Todos');
@@ -60,7 +60,7 @@ async function enviarProactivos(db, messaging, tokens) {
         return;
     }
 
-    const regsSnap = await db.collection('registros_ronda').where('fechaISO', '==', hoyISO).limit(500).get();
+    const regsSnap = await db.collection('plantas').doc(plantaId).collection('registros_ronda').where('fechaISO', '==', hoyISO).limit(500).get();
     const regsHoy = regsSnap.docs.map(d => d.data());
 
     const grupoPrevio = [];
@@ -75,22 +75,24 @@ async function enviarProactivos(db, messaging, tokens) {
         const diffMin = Math.round((ahora.getTime() - obj.getTime()) / 60000);
         const margen = Number(ruta.margen) || 15;
 
-        if (diffMin <= -3 && diffMin >= -12) grupoPrevio.push(ruta);
+        const previo = Number(ajustes.minutosAvisoPrevio) || 8;
+        if (diffMin <= -(previo - 1) && diffMin >= -(previo + 1)) grupoPrevio.push(ruta);
 
         const minParaFin = margen - diffMin;
-        if (diffMin > 0 && minParaFin <= 5 && minParaFin >= 0) grupoVence.push(ruta);
+        if (diffMin > 0 && minParaFin <= (Number(ajustes.minutosAvisoVencimiento) || 5) && minParaFin >= 0) grupoVence.push(ruta);
         else if (diffMin > margen && !huboEscaneo(regsHoy, ruta)) grupoIncumplido.push(ruta);
     }
 
-    const alertasRef = db.collection('config').doc('push_alertas');
+    const alertasRef = db.collection('config').doc(`push_alertas_${plantaId}`);
     const alertasSnap = await alertasRef.get();
     const alertas = alertasSnap.exists ? (alertasSnap.data() || {}) : {};
     const nowMs = Date.now();
 
-    const cooldowns = { lote_8m: 15 * 60 * 1000, lote_3m: 10 * 60 * 1000, lote_inc: 60 * 60 * 1000 };
+    const cooldowns = { lote_8m: 15 * 60 * 1000, lote_3m: 10 * 60 * 1000, lote_inc: (Number(ajustes.repeticionIncumplimientoMinutos) || 60) * 60 * 1000 };
 
     async function enviarGrupo(grupo, cooldownKey, titulo, bodyFn, severidad, tag) {
-        if (grupo.length === 0 || tokens.length === 0) return;
+        const tokensPlanta = tokens.filter(d => Array.isArray(d.plantas) && (d.plantas.includes('*') || d.plantas.includes(plantaId))).map(d => d.token).filter(Boolean);
+        if (grupo.length === 0 || tokensPlanta.length === 0) return;
         const hash = grupo.map(r => r.codigoQR + '@' + r.hora).sort().join(',');
         const key = `${cooldownKey}_${hash}`;
         const last = alertas[key] || 0;
@@ -100,7 +102,7 @@ async function enviarProactivos(db, messaging, tokens) {
         const body = bodyFn(cant);
         try {
             await messaging.sendEachForMulticast({
-                tokens,
+                tokens: tokensPlanta,
                 data: { title: titulo, body, severidad, tag, punto: grupo.map(r => r.puntoNombre).join(', ') },
                 android: { priority: 'high' },
                 webpush: { headers: { Urgency: 'high' } }
@@ -151,20 +153,27 @@ module.exports = async (req, res) => {
         initAdmin();
         const db = admin.firestore();
         const messaging = admin.messaging();
+        const ajustesSnap = await db.collection('config').doc('push_settings').get();
+        const ajustes = ajustesSnap.exists ? ajustesSnap.data() : {};
+        const notificacionesActivas = ajustes.activo !== false;
 
         const tokensSnap = await db.collection('dispositivos_notificaciones').get();
-        const tokens = tokensSnap.docs.map(d => d.data().token).filter(Boolean);
-        console.log(`[Push] Tokens registrados: ${tokens.length} (docs: ${tokensSnap.size})`);
+        const tokens = tokensSnap.docs.map(d => d.data()).filter(d => d.token && d.activo !== false);
+        const plantasSnap = await db.collection('plantas').get();
+        const plantas = plantasSnap.docs.map(d => d.id);
+        console.log(`[Push] Tokens registrados: ${tokens.length} (docs: ${tokensSnap.size}); plantas: ${plantas.length}`);
 
         // 1) Alertas proactivas (próximo, vencimiento, incumplimiento).
-        await enviarProactivos(db, messaging, tokens);
+        if (notificacionesActivas) {
+            for (const plantaId of plantas) await enviarProactivos(db, messaging, tokens, plantaId, ajustes);
+        }
 
         // 2) Incidentes post-escaneo (registros CRITICO/ADVERTENCIA nuevos).
         const cursorRef = db.collection('config').doc('push_cursor');
         const cursorSnap = await cursorRef.get();
         const lastMs = cursorSnap.exists ? (cursorSnap.data().lastMs || 0) : Date.now() - 5 * 60 * 1000;
 
-        const snap = await db.collection('registros_ronda')
+        const snap = await db.collectionGroup('registros_ronda')
             .where('timestampMs', '>', lastMs)
             .orderBy('timestampMs', 'asc')
             .limit(200)
@@ -178,8 +187,13 @@ module.exports = async (req, res) => {
                 const reg = doc.data();
                 if (typeof reg.timestampMs === 'number') maxMs = Math.max(maxMs, reg.timestampMs);
 
+                if (!notificacionesActivas) continue;
+
                 if (reg.severidad !== 'CRITICO' && reg.severidad !== 'ADVERTENCIA') continue;
-                if (tokens.length === 0) continue;
+                const plantaId = doc.ref.parent.parent?.id;
+                if (!plantaId) continue;
+                const tokensPlanta = tokens.filter(d => Array.isArray(d.plantas) && (d.plantas.includes('*') || d.plantas.includes(plantaId))).map(d => d.token).filter(Boolean);
+                if (tokensPlanta.length === 0) continue;
 
                 const critico = reg.severidad === 'CRITICO';
                 const title = critico ? '⚠️ Incidencia crítica' : '⚠️ Desvío de ronda';
@@ -187,7 +201,7 @@ module.exports = async (req, res) => {
 
                 try {
                     const resp = await messaging.sendEachForMulticast({
-                        tokens,
+                        tokens: tokensPlanta,
                         data: {
                             title,
                             body,
@@ -221,17 +235,18 @@ module.exports = async (req, res) => {
                 const corte = Date.now() - 60 * 24 * 60 * 60 * 1000;
                 let eliminados = 0;
                 for (let i = 0; i < 3; i++) {
-                    const oldSnap = await db.collection('registros_ronda')
-                        .where('timestampMs', '<', corte)
-                        .orderBy('timestampMs', 'asc')
-                        .limit(400)
-                        .get();
-                    if (oldSnap.empty) break;
-                    const batch = db.batch();
-                    oldSnap.forEach(d => batch.delete(d.ref));
-                    await batch.commit();
-                    eliminados += oldSnap.size;
-                    if (oldSnap.size < 400) break;
+                    for (const plantaId of plantas) {
+                        const oldSnap = await db.collection('plantas').doc(plantaId).collection('registros_ronda')
+                            .where('timestampMs', '<', corte)
+                            .orderBy('timestampMs', 'asc')
+                            .limit(400)
+                            .get();
+                        if (oldSnap.empty) continue;
+                        const batch = db.batch();
+                        oldSnap.forEach(d => batch.delete(d.ref));
+                        await batch.commit();
+                        eliminados += oldSnap.size;
+                    }
                 }
                 await cursorRef.set({ lastCleanup: Date.now() }, { merge: true });
                 if (eliminados > 0) console.log(`[Push] Limpieza: ${eliminados} registros antiguos eliminados.`);

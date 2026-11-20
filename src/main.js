@@ -33,6 +33,10 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         const db = getFirestore(app);
         const auth = getAuth(app);
 
+        // Planta activa de la sesión autenticada.
+        let plantaActiva = '';
+        let plantasDisponibles = [];
+
         let swRegistration = null;
         let fcmMessaging = null;
         let unsubscribeIncidenciasSupervisor = null;
@@ -91,6 +95,15 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             timerAvisoPanel = setTimeout(() => el.classList.add('hidden'), 6000);
         }
 
+        function mostrarModalLogin() {
+            const modal = document.getElementById('modal-login-encargado');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            modal.style.display = 'flex';
+            const btnCerrar = document.getElementById('btn-cerrar-login');
+            if (btnCerrar) btnCerrar.style.display = sessionStorage.getItem('usuario_uid') ? 'flex' : 'none';
+        }
+
         function mostrarMensajeForm(id, texto, tipo = "ok") {
             const el = document.getElementById(id);
             if (!el) return mostrarAvisoPanel(texto, tipo);
@@ -130,8 +143,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             // Mostrar el login de inmediato si no hay sesión; el listener de auth
             // lo ocultará si se restaura una sesión válida.
             if (!sessionStorage.getItem('usuario_uid')) {
-                const modalLogin = document.getElementById('modal-login-encargado');
-                if (modalLogin) modalLogin.classList.remove('hidden');
+                mostrarModalLogin();
             }
 
             refrescarVistaOperador();
@@ -157,11 +169,21 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                         } else {
                             sessionStorage.removeItem('sesion_encargado');
                         }
+                        // Resolver la planta activa a partir del perfil.
+                        const plantas = perfil.plantas || [];
+                        await configurarPlantasUsuario(plantas, rol);
+                        if (!plantaActiva) {
+                            await signOut(auth);
+                            throw new Error('El usuario no tiene una planta activa asignada.');
+                        }
                         sessionStorage.setItem('usuario_uid', user.uid);
                         sessionStorage.setItem('usuario_rol', rol);
                         sessionStorage.setItem('usuario_nombre', perfil.nombre || user.email.split('@')[0]);
-                        sessionStorage.setItem('usuario_plantas', JSON.stringify(perfil.plantas || []));
+                        sessionStorage.setItem('usuario_plantas', JSON.stringify(plantas));
                         actualizarInterfazSegunRol();
+                        cerrarModalLoginEncargado();
+                        try { await llamarApiUsuarios({ accion: 'registrar_acceso' }); }
+                        catch (error) { console.warn('[Accesos] No se pudo guardar el acceso:', error.message); }
                         // Cargar datos de la app (catálogos + registros).
                         await Promise.all([
                             cargarOperadores(),
@@ -169,8 +191,11 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                             cargarRutas(),
                             cargarRegistrosHoy()
                         ]);
+                        if ("Notification" in window && Notification.permission === "granted") {
+                            await registrarTokenFCM(rol === 'operador' ? 'operador' : 'encargado');
+                        }
                         await sincronizarColaOffline();
-                        limpiarRegistrosAntiguos();
+                        if (rol === 'superadmin' || rol === 'gerente') limpiarRegistrosAntiguos();
                         if (perfil.rol === 'superadmin' || perfil.rol === 'gerente') {
                             await cargarDatosPanelAdmin();
                             renderizarTodoAdmin();
@@ -187,12 +212,81 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                     sessionStorage.removeItem('usuario_plantas');
                     actualizarInterfazSegunRol();
                     // Mostrar el modal de login si no hay sesión.
-                    const modalLogin = document.getElementById('modal-login-encargado');
-                    if (modalLogin) modalLogin.classList.remove('hidden');
+                    mostrarModalLogin();
                 }
                 })();
             });
         });
+
+        async function configurarPlantasUsuario(asignadas, rol) {
+            let docs = [];
+            if (rol === 'superadmin' || asignadas.includes('*')) {
+                const snap = await getDocs(collection(db, 'plantas'));
+                docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            } else {
+                docs = await Promise.all(asignadas.map(async id => {
+                    const snap = await getDoc(doc(db, 'plantas', id));
+                    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+                }));
+                docs = docs.filter(Boolean);
+            }
+            plantasDisponibles = docs.filter(p => p.activo !== false);
+            const guardada = sessionStorage.getItem('planta_activa');
+            plantaActiva = plantasDisponibles.some(p => p.id === guardada)
+                ? guardada
+                : (plantasDisponibles[0]?.id || '');
+            sessionStorage.setItem('planta_activa', plantaActiva);
+
+            const selector = document.getElementById('selector-planta');
+            const contenedor = document.getElementById('contenedor-selector-planta');
+            if (!selector || !contenedor) return;
+            selector.replaceChildren();
+            plantasDisponibles.forEach(planta => {
+                const opcion = document.createElement('option');
+                opcion.value = planta.id;
+                opcion.textContent = planta.nombre || planta.id;
+                selector.appendChild(opcion);
+            });
+            selector.value = plantaActiva;
+            contenedor.classList.toggle('hidden', plantasDisponibles.length < 2 || !['superadmin', 'gerente'].includes(rol));
+            contenedor.classList.toggle('flex', plantasDisponibles.length > 1 && ['superadmin', 'gerente'].includes(rol));
+            const tabUsuarios = document.getElementById('tab-usuarios');
+            if (tabUsuarios) {
+                const habilitado = rol === 'superadmin';
+                tabUsuarios.style.display = habilitado ? 'flex' : 'none';
+                tabUsuarios.setAttribute('aria-hidden', String(!habilitado));
+                tabUsuarios.tabIndex = habilitado ? 0 : -1;
+            }
+            const tabAdministracion = document.getElementById('tab-administracion');
+            if (tabAdministracion) {
+                const habilitado = rol === 'superadmin';
+                tabAdministracion.style.display = habilitado ? 'flex' : 'none';
+                tabAdministracion.setAttribute('aria-hidden', String(!habilitado));
+                tabAdministracion.tabIndex = habilitado ? 0 : -1;
+            }
+            const plantasNuevas = document.getElementById('usuarios-plantas-nuevas');
+            if (plantasNuevas) {
+                plantasNuevas.replaceChildren();
+                plantasDisponibles.forEach(planta => {
+                    const etiqueta = document.createElement('label');
+                    etiqueta.className = 'inline-flex items-center gap-2';
+                    etiqueta.innerHTML = `<input type="checkbox" name="planta-nueva" value="${escapeHtml(planta.id)}" class="accent-slate-900">${escapeHtml(planta.nombre || planta.id)}`;
+                    plantasNuevas.appendChild(etiqueta);
+                });
+            }
+        }
+
+        window.cambiarPlantaActiva = async (id) => {
+            if (!plantasDisponibles.some(p => p.id === id) || id === plantaActiva) return;
+            plantaActiva = id;
+            sessionStorage.setItem('planta_activa', id);
+            offsetDiasFiltro = 0;
+            await sincronizarColaOffline();
+            await cargarDatosPanelAdmin();
+            renderizarTodoAdmin();
+            refrescarVistaOperador();
+            mostrarAvisoPanel(`Planta activa: ${plantasDisponibles.find(p => p.id === id)?.nombre || id}.`, 'ok');
+        };
 
         function refrescarVistaOperador() {
             renderizarProgresoYProximoOperador();
@@ -800,12 +894,14 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                     estado,
                     severidad,
                     creadoEn: new Date(ahora.getTime()),
-                    expiraEn: new Date(ahora.getTime() + RETENCION_MS)
+                    expiraEn: new Date(ahora.getTime() + RETENCION_MS),
+                    _plantaId: plantaActiva
                 };
 
                 try {
                     if (!navigator.onLine) throw new Error();
-                    await addDoc(collection(db, "registros_ronda"), nuevoReg);
+                    const { _plantaId, ...registroFs } = nuevoReg;
+                    await addDoc(collection(db, "plantas", _plantaId, "registros_ronda"), registroFs);
                 } catch (e) {
                     const cola = JSON.parse(localStorage.getItem('cola_rondas_offline') || '[]');
                     cola.push(nuevoReg);
@@ -1021,23 +1117,22 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             const err = document.getElementById('error-login-encargado');
             input.value = '';
             input.type = 'password';
+            err.textContent = 'Usuario o contraseña incorrectos';
             document.getElementById('icono-ojo-clave').className = "fa-regular fa-eye text-sm";
             input.classList.remove('border-[#DC2626]');
             err.classList.add('hidden');
 
-            document.getElementById('modal-login-encargado').classList.remove('hidden');
+            mostrarModalLogin();
             requestAnimationFrame(() => {
-                document.getElementById('sheet-login-encargado').classList.remove('scale-95', 'opacity-0');
                 setTimeout(() => input.focus(), 260);
             });
         };
 
         window.cerrarModalLoginEncargado = () => {
             if (!sessionStorage.getItem('usuario_uid')) return;
-            document.getElementById('sheet-login-encargado').classList.add('scale-95', 'opacity-0');
-            setTimeout(() => {
-                document.getElementById('modal-login-encargado').classList.add('hidden');
-            }, 250);
+            const modal = document.getElementById('modal-login-encargado');
+            modal.classList.add('hidden');
+            modal.style.display = 'none';
         };
 
         window.toggleVerClaveEncargado = () => {
@@ -1078,11 +1173,20 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                     return;
                 }
 
-                sessionStorage.setItem('sesion_encargado', 'activa');
                 sessionStorage.setItem('usuario_uid', uid);
-                sessionStorage.setItem('usuario_rol', perfil.rol || 'operador');
+                const rolSesion = perfil.rol || 'operador';
+                if (rolSesion === 'superadmin' || rolSesion === 'gerente') sessionStorage.setItem('sesion_encargado', 'activa');
+                else sessionStorage.removeItem('sesion_encargado');
+                sessionStorage.setItem('usuario_rol', rolSesion);
                 sessionStorage.setItem('usuario_nombre', perfil.nombre || usuario);
                 sessionStorage.setItem('usuario_plantas', JSON.stringify(perfil.plantas || []));
+                await configurarPlantasUsuario(perfil.plantas || [], perfil.rol || 'operador');
+                if (!plantaActiva) {
+                    await signOut(auth);
+                    err.textContent = 'Tu usuario todavía no tiene una planta activa asignada.';
+                    err.classList.remove('hidden');
+                    return;
+                }
 
                 cerrarModalLoginEncargado();
                 actualizarInterfazSegunRol();
@@ -1115,13 +1219,29 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 registrarTokenFCM('operador');
             }
             refrescarVistaOperador();
+            mostrarModalLogin();
         };
 
         function actualizarInterfazSegunRol() {
             const esEncargado = sessionStorage.getItem('sesion_encargado') === 'activa';
-            document.getElementById('vista-operador').classList.toggle('hidden', esEncargado);
-            document.getElementById('header-operador').classList.toggle('hidden', esEncargado);
-            document.getElementById('barra-inferior-operador').classList.toggle('hidden', esEncargado);
+            const tieneSesion = Boolean(sessionStorage.getItem('usuario_uid'));
+            const esOperadorAutenticado = tieneSesion && !esEncargado;
+            const tabUsuarios = document.getElementById('tab-usuarios');
+            const tabAdministracion = document.getElementById('tab-administracion');
+            const esSuperadmin = sessionStorage.getItem('usuario_rol') === 'superadmin';
+            if (tabUsuarios) {
+                tabUsuarios.style.display = esSuperadmin ? 'flex' : 'none';
+                tabUsuarios.setAttribute('aria-hidden', String(!esSuperadmin));
+                tabUsuarios.tabIndex = esSuperadmin ? 0 : -1;
+            }
+            if (tabAdministracion) {
+                tabAdministracion.style.display = esSuperadmin ? 'flex' : 'none';
+                tabAdministracion.setAttribute('aria-hidden', String(!esSuperadmin));
+                tabAdministracion.tabIndex = esSuperadmin ? 0 : -1;
+            }
+            document.getElementById('vista-operador').classList.toggle('hidden', !esOperadorAutenticado);
+            document.getElementById('header-operador').classList.toggle('hidden', !esOperadorAutenticado);
+            document.getElementById('barra-inferior-operador').classList.toggle('hidden', !esOperadorAutenticado);
 
             document.getElementById('vista-encargado').classList.toggle('hidden', !esEncargado);
             document.getElementById('header-encargado').classList.toggle('hidden', !esEncargado);
@@ -1276,7 +1396,9 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                         timestampMs: Date.now(),
                         userAgent: navigator.userAgent,
                         plataforma: /android/i.test(navigator.userAgent) ? "Android" : "Web",
-                        activo: true
+                        activo: true,
+                        usuarioUid: auth.currentUser?.uid || null,
+                        plantas: JSON.parse(sessionStorage.getItem('usuario_plantas') || '[]')
                     }, { merge: true });
                     console.log(`[FCM] Dispositivo registrado como [${rol}]:`, tokenSafeId);
                 }
@@ -1419,7 +1541,9 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                     if (itemFs.creadoEn) itemFs.creadoEn = new Date(itemFs.creadoEn);
                     if (itemFs.expiraEn) itemFs.expiraEn = new Date(itemFs.expiraEn);
                     else if (itemFs.timestampMs) itemFs.expiraEn = new Date(Number(itemFs.timestampMs) + RETENCION_MS);
-                    await addDoc(collection(db, "registros_ronda"), itemFs);
+                    const destinoPlanta = itemFs._plantaId || plantaActiva;
+                    delete itemFs._plantaId;
+                    await addDoc(collection(db, "plantas", destinoPlanta, "registros_ronda"), itemFs);
                 } catch (e) {
                     restantes.push(item);
                 }
@@ -1441,7 +1565,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             try {
                 for (let lote = 0; lote < 5; lote++) {
                     const snap = await getDocs(query(
-                        collection(db, "registros_ronda"),
+                        collection(db, "plantas", plantaActiva, "registros_ronda"),
                         where("timestampMs", "<", corte),
                         orderBy("timestampMs", "asc"),
                         limit(400)
@@ -1463,7 +1587,8 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
         }
 
         window.cambiarTabAdmin = (tab) => {
-            ['auditoria', 'puntos', 'rutas', 'personal'].forEach(t => {
+            if (['usuarios', 'administracion'].includes(tab) && sessionStorage.getItem('usuario_rol') !== 'superadmin') return;
+            ['auditoria', 'puntos', 'rutas', 'personal', 'usuarios', 'administracion'].forEach(t => {
                 const sec = document.getElementById(`seccion-${t}`);
                 const btn = document.getElementById(`tab-${t}`);
                 if (t === tab) {
@@ -1474,9 +1599,257 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                     btn.className = "pb-3 text-sm font-medium border-b-2 border-transparent text-[#64748B] hover:text-[#1E293B] flex items-center gap-2.5 whitespace-nowrap transition";
                 }
             });
-            const nombresTab = { auditoria: "Auditoría", puntos: "Puntos de control", rutas: "Programación de horarios", personal: "Personal" };
+            const nombresTab = { auditoria: "Auditoría", puntos: "Puntos de control", rutas: "Programación de horarios", personal: "Personal", usuarios: "Usuarios del sistema", administracion: "Administración" };
             document.getElementById('breadcrumb-actual').textContent = nombresTab[tab];
+            if (tab === 'usuarios') cargarUsuariosSistema();
+            if (tab === 'administracion') cargarResumenSuperadmin();
         };
+
+        async function llamarApiUsuarios(datos) {
+            if (!auth.currentUser) throw new Error('La sesión expiró. Volvé a iniciar sesión.');
+            const token = await auth.currentUser.getIdToken();
+            const respuesta = await fetch('/api/usuarios', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(datos)
+            });
+            const resultado = await respuesta.json();
+            if (!respuesta.ok) throw new Error(resultado.error || 'No se pudo completar la operación.');
+            return resultado;
+        }
+
+        function formatearFechaAcceso(timestampMs) {
+            if (!Number.isFinite(Number(timestampMs))) return '—';
+            return new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(Number(timestampMs)));
+        }
+
+        function actualizarPlantasAdministracion(plantas) {
+            plantasDisponibles = plantas.filter(planta => planta.activo !== false);
+            const selector = document.getElementById('selector-planta');
+            if (selector) {
+                const anterior = plantaActiva;
+                selector.replaceChildren();
+                plantasDisponibles.forEach(planta => {
+                    const opcion = document.createElement('option');
+                    opcion.value = planta.id;
+                    opcion.textContent = planta.nombre || planta.id;
+                    selector.appendChild(opcion);
+                });
+                if (!plantasDisponibles.some(planta => planta.id === anterior)) {
+                    plantaActiva = plantasDisponibles[0]?.id || '';
+                    sessionStorage.setItem('planta_activa', plantaActiva);
+                }
+                selector.value = plantaActiva;
+            }
+            const selectorBox = document.getElementById('contenedor-selector-planta');
+            if (selectorBox) {
+                selectorBox.classList.toggle('hidden', plantasDisponibles.length < 2);
+                selectorBox.classList.toggle('flex', plantasDisponibles.length > 1);
+            }
+            const asignaciones = document.getElementById('usuarios-plantas-nuevas');
+            if (asignaciones) {
+                asignaciones.replaceChildren();
+                plantasDisponibles.forEach(planta => {
+                    const label = document.createElement('label');
+                    label.className = 'inline-flex items-center gap-2';
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.name = 'planta-nueva';
+                    checkbox.value = planta.id;
+                    checkbox.className = 'accent-slate-900';
+                    label.append(checkbox, document.createTextNode(planta.nombre || planta.id));
+                    asignaciones.appendChild(label);
+                });
+            }
+        }
+
+        function renderizarPlantasSuperadmin(plantas) {
+            const cuerpo = document.getElementById('tabla-plantas-admin');
+            if (!cuerpo) return;
+            cuerpo.replaceChildren();
+            plantas.sort((a, b) => String(a.nombre || a.id).localeCompare(String(b.nombre || b.id), 'es')).forEach(planta => {
+                const fila = document.createElement('tr');
+                const nombre = document.createElement('td');
+                nombre.className = 'p-3 font-medium text-[#0F172A]';
+                nombre.textContent = planta.nombre || planta.id;
+                const estado = document.createElement('td');
+                estado.className = 'p-3';
+                estado.textContent = planta.activo === false ? 'Deshabilitada' : 'Activa';
+                const accion = document.createElement('td');
+                accion.className = 'p-3 text-right';
+                const boton = document.createElement('button');
+                boton.type = 'button';
+                boton.className = planta.activo === false ? 'text-[#047857] font-semibold' : 'text-[#B91C1C] font-semibold';
+                boton.textContent = planta.activo === false ? 'Habilitar' : 'Deshabilitar';
+                boton.onclick = () => cambiarEstadoPlantaSistema(planta.id, planta.activo === false);
+                accion.appendChild(boton);
+                fila.append(nombre, estado, accion);
+                cuerpo.appendChild(fila);
+            });
+        }
+
+        function renderizarAccesosSuperadmin(accesos) {
+            const cuerpo = document.getElementById('tabla-accesos-admin');
+            if (!cuerpo) return;
+            cuerpo.replaceChildren();
+            accesos.forEach(acceso => {
+                const fila = document.createElement('tr');
+                const plantaNombres = (acceso.plantas || []).map(id => id === '*' ? 'Todas' : (plantasDisponibles.find(p => p.id === id)?.nombre || id)).join(', ') || '—';
+                const lugar = [acceso.ciudad, acceso.region, acceso.pais].filter(Boolean).join(', ') || 'Ubicación no disponible';
+                [formatearFechaAcceso(acceso.timestampMs), acceso.usuario || acceso.nombre || '—', acceso.rol || '—', plantaNombres, lugar, acceso.dispositivo || '—'].forEach(valor => {
+                    const celda = document.createElement('td');
+                    celda.className = 'p-3 align-top';
+                    celda.textContent = valor;
+                    fila.appendChild(celda);
+                });
+                cuerpo.appendChild(fila);
+            });
+        }
+
+        window.cargarResumenSuperadmin = async () => {
+            if (sessionStorage.getItem('usuario_rol') !== 'superadmin') return;
+            try {
+                const resumen = await llamarApiUsuarios({ accion: 'resumen_superadmin' });
+                actualizarPlantasAdministracion(resumen.plantas || []);
+                renderizarPlantasSuperadmin(resumen.plantas || []);
+                renderizarAccesosSuperadmin(resumen.accesos || []);
+                const ajustes = resumen.ajustes || {};
+                document.getElementById('ajuste-notificaciones-activo').checked = ajustes.activo !== false;
+                document.getElementById('ajuste-minutos-aviso-previo').value = ajustes.minutosAvisoPrevio ?? 8;
+                document.getElementById('ajuste-minutos-aviso-vencimiento').value = ajustes.minutosAvisoVencimiento ?? 5;
+                document.getElementById('ajuste-repeticion-incumplimiento').value = ajustes.repeticionIncumplimientoMinutos ?? 60;
+                mostrarAvisoAdministracion('Configuración actualizada.');
+            } catch (error) {
+                mostrarAvisoAdministracion(error.message, true);
+            }
+        };
+
+        function mostrarAvisoAdministracion(texto, error = false) {
+            const el = document.getElementById('msg-administracion');
+            if (!el) return;
+            el.textContent = texto;
+            el.className = `text-xs mt-3 ${error ? 'text-[#B91C1C]' : 'text-[#047857]'}`;
+        }
+
+        window.crearPlantaSistema = async () => {
+            const input = document.getElementById('planta-nueva-nombre');
+            const nombre = input.value.trim();
+            try {
+                await llamarApiUsuarios({ accion: 'crear_planta', nombre });
+                input.value = '';
+                await cargarResumenSuperadmin();
+                mostrarAvisoAdministracion(`Planta “${nombre}” creada.`);
+            } catch (error) { mostrarAvisoAdministracion(error.message, true); }
+        };
+
+        async function cambiarEstadoPlantaSistema(uid, activo) {
+            try {
+                await llamarApiUsuarios({ accion: 'estado_planta', uid, activo });
+                await cargarResumenSuperadmin();
+                await configurarPlantasUsuario(JSON.parse(sessionStorage.getItem('usuario_plantas') || '[]'), 'superadmin');
+                await Promise.all([cargarOperadores(), cargarPuntos(), cargarRutas(), cargarRegistrosHoy()]);
+                await cargarDatosPanelAdmin();
+                renderizarTodoAdmin();
+                refrescarVistaOperador();
+                mostrarAvisoAdministracion(`Planta ${activo ? 'habilitada' : 'deshabilitada'}.`);
+            } catch (error) { mostrarAvisoAdministracion(error.message, true); }
+        }
+
+        window.guardarAjustesNotificaciones = async () => {
+            const ajustes = {
+                activo: document.getElementById('ajuste-notificaciones-activo').checked,
+                minutosAvisoPrevio: Number(document.getElementById('ajuste-minutos-aviso-previo').value),
+                minutosAvisoVencimiento: Number(document.getElementById('ajuste-minutos-aviso-vencimiento').value),
+                repeticionIncumplimientoMinutos: Number(document.getElementById('ajuste-repeticion-incumplimiento').value)
+            };
+            try {
+                await llamarApiUsuarios({ accion: 'guardar_ajustes_push', ajustes });
+                mostrarAvisoAdministracion('Ajustes de notificaciones guardados.');
+            } catch (error) { mostrarAvisoAdministracion(error.message, true); }
+        };
+
+        function mostrarAvisoUsuarios(texto, error = false) {
+            const el = document.getElementById('msg-usuarios');
+            if (!el) return;
+            el.textContent = texto;
+            el.className = `text-xs mt-3 ${error ? 'text-[#B91C1C]' : 'text-[#047857]'}`;
+        }
+
+        window.cargarUsuariosSistema = async () => {
+            if (sessionStorage.getItem('usuario_rol') !== 'superadmin') return;
+            const cuerpo = document.getElementById('tabla-usuarios-sistema');
+            if (!cuerpo) return;
+            try {
+                const { usuarios } = await llamarApiUsuarios({ accion: 'listar' });
+                cuerpo.replaceChildren();
+                usuarios.forEach(usuario => {
+                    const fila = document.createElement('tr');
+                    const datos = [usuario.usuario || usuario.nombre || '—', usuario.rol || '—', (usuario.plantas || []).map(id => plantasDisponibles.find(p => p.id === id)?.nombre || id).join(', ') || 'Todas', usuario.activo === false ? 'Inactivo' : 'Activo'];
+                    datos.forEach(valor => {
+                        const celda = document.createElement('td');
+                        celda.className = 'p-3';
+                        celda.textContent = valor;
+                        fila.appendChild(celda);
+                    });
+                    const acciones = document.createElement('td');
+                    acciones.className = 'p-3 text-right whitespace-nowrap';
+                    if (usuario.rol !== 'superadmin') {
+                        const botonClave = document.createElement('button');
+                        botonClave.className = 'px-2 py-1 text-[#334155]';
+                        botonClave.textContent = 'Restablecer clave';
+                        botonClave.onclick = () => restablecerClaveUsuario(usuario.uid);
+                        acciones.appendChild(botonClave);
+                        const botonEstado = document.createElement('button');
+                        botonEstado.className = 'px-2 py-1 text-[#B91C1C]';
+                        botonEstado.textContent = usuario.activo === false ? 'Activar' : 'Desactivar';
+                        botonEstado.onclick = () => cambiarEstadoUsuarioSistema(usuario.uid, usuario.activo === false);
+                        acciones.appendChild(botonEstado);
+                    }
+                    fila.appendChild(acciones);
+                    cuerpo.appendChild(fila);
+                });
+            } catch (error) {
+                mostrarAvisoUsuarios(error.message, true);
+            }
+        };
+
+        window.crearUsuarioSistema = async () => {
+            const plantas = [...document.querySelectorAll('input[name="planta-nueva"]:checked')].map(el => el.value);
+            const datos = {
+                accion: 'crear',
+                usuario: document.getElementById('usuario-nuevo-login').value,
+                nombre: document.getElementById('usuario-nuevo-nombre').value,
+                rol: document.getElementById('usuario-nuevo-rol').value,
+                clave: document.getElementById('usuario-nueva-clave').value,
+                plantas
+            };
+            try {
+                await llamarApiUsuarios(datos);
+                document.getElementById('usuario-nuevo-login').value = '';
+                document.getElementById('usuario-nuevo-nombre').value = '';
+                document.getElementById('usuario-nueva-clave').value = '';
+                mostrarAvisoUsuarios('Usuario creado. Compartí la contraseña inicial por un canal seguro.');
+                await cargarUsuariosSistema();
+            } catch (error) { mostrarAvisoUsuarios(error.message, true); }
+        };
+
+        async function restablecerClaveUsuario(uid) {
+            const clave = prompt('Ingresá la nueva contraseña (mínimo 8 caracteres):');
+            if (clave === null) return;
+            try {
+                await llamarApiUsuarios({ accion: 'clave', uid, clave });
+                mostrarAvisoUsuarios('Contraseña actualizada y sesiones anteriores revocadas.');
+            } catch (error) { mostrarAvisoUsuarios(error.message, true); }
+        }
+
+        async function cambiarEstadoUsuarioSistema(uid, activo) {
+            if (!confirm(activo ? '¿Activar este usuario?' : '¿Desactivar este usuario?')) return;
+            try {
+                await llamarApiUsuarios({ accion: 'estado', uid, activo });
+                await cargarUsuariosSistema();
+                mostrarAvisoUsuarios(activo ? 'Usuario activado.' : 'Usuario desactivado.');
+            } catch (error) { mostrarAvisoUsuarios(error.message, true); }
+        }
 
         window.actualizarDatosPanel = async () => {
             const icono = document.getElementById('icono-actualizar');
@@ -1505,7 +1878,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
         async function cargarOperadores() {
             try {
-                const snap = await getDocs(collection(db, "operadores"));
+                const snap = await getDocs(collection(db, "plantas", plantaActiva, "operadores"));
                 operadoresCache = [];
                 snap.forEach(d => operadoresCache.push({ id: d.id, ...d.data() }));
 
@@ -1537,7 +1910,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
         async function cargarPuntos() {
             try {
-                const snap = await getDocs(collection(db, "puntos_control"));
+                const snap = await getDocs(collection(db, "plantas", plantaActiva, "puntos_control"));
                 const pts = [];
                 snap.forEach(d => pts.push({ id: d.id, ...d.data() }));
                 puntosCache = {};
@@ -1570,7 +1943,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
         async function cargarRutas() {
             try {
-                const snap = await getDocs(collection(db, "rutas_horarias"));
+                const snap = await getDocs(collection(db, "plantas", plantaActiva, "rutas_horarias"));
                 rutasCache = [];
                 snap.forEach(d => rutasCache.push({ id: d.id, ...d.data() }));
             } catch (e) {
@@ -1582,7 +1955,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             try {
                 const fecha = obtenerFechaHoyISO();
                 const snap = await getDocs(query(
-                    collection(db, "registros_ronda"),
+                    collection(db, "plantas", plantaActiva, "registros_ronda"),
                     where("fechaISO", "==", fecha),
                     limit(LIMITE_REGISTROS_DIA)
                 ));
@@ -1599,7 +1972,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             const fecha = obtenerFechaFiltroISO();
             try {
                 const snap = await getDocs(query(
-                    collection(db, "registros_ronda"),
+                    collection(db, "plantas", plantaActiva, "registros_ronda"),
                     where("fechaISO", "==", fecha),
                     limit(LIMITE_REGISTROS_DIA)
                 ));
@@ -2551,7 +2924,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 try {
                     const codigo = generarCodigoPuntoUnico();
-                    await addDoc(collection(db, "puntos_control"), {
+                    await addDoc(collection(db, "plantas", plantaActiva, "puntos_control"), {
                         codigo, nombre, tolerancia,
                         lat: parseFloat(pos.coords.latitude.toFixed(5)),
                         lng: parseFloat(pos.coords.longitude.toFixed(5))
@@ -2584,7 +2957,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
             try {
                 const codigo = generarCodigoPuntoUnico();
-                await addDoc(collection(db, "puntos_control"), { codigo, nombre, tolerancia, lat, lng });
+                await addDoc(collection(db, "plantas", plantaActiva, "puntos_control"), { codigo, nombre, tolerancia, lat, lng });
                 document.getElementById('punto-nombre').value = '';
                 document.getElementById('punto-lat').value = '';
                 document.getElementById('punto-lng').value = '';
@@ -2624,7 +2997,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                     const punto = puntosCache[codigoQR];
                     const puntoNombre = punto ? punto.nombre : codigoQR;
                     diasSeleccionadosForm.forEach(dia => {
-                        const ref = doc(collection(db, "rutas_horarias"));
+                        const ref = doc(collection(db, "plantas", plantaActiva, "rutas_horarias"));
                         batch.set(ref, { dia, codigoQR, puntoNombre, hora, margen });
                     });
                 });
@@ -2715,7 +3088,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             }
 
             try {
-                await addDoc(collection(db, "operadores"), { nombre, legajo, turno: turnoOpSeleccionado, activo: true });
+                await addDoc(collection(db, "plantas", plantaActiva, "operadores"), { nombre, legajo, turno: turnoOpSeleccionado, activo: true });
                 document.getElementById('op-nombre').value = '';
                 document.getElementById('op-legajo').value = '';
                 await cargarOperadores();
@@ -2729,7 +3102,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
         window.toggleOperadorActivo = async (id, activo) => {
             try {
-                await updateDoc(doc(db, "operadores", id), { activo });
+                await updateDoc(doc(db, "plantas", plantaActiva, "operadores", id), { activo });
                 await cargarOperadores();
                 renderizarPersonalAdmin();
                 mostrarMensajeForm('msg-operador', activo ? "Operador activado." : "Operador desactivado.", 'ok');
@@ -2854,7 +3227,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
         async function actualizarNombreEnRutas(codigoQR, nombre) {
             const snap = await getDocs(query(
-                collection(db, "rutas_horarias"),
+                collection(db, "plantas", plantaActiva, "rutas_horarias"),
                 where("codigoQR", "==", codigoQR)
             ));
             const rutas = snap.docs;
@@ -2877,7 +3250,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             if (existePuntoConNombre(nombre, punto.codigo)) return mostrarAvisoPanel('Ya existe otro punto con ese nombre.', 'error');
 
             try {
-                await updateDoc(doc(db, "puntos_control", id), { nombre });
+                await updateDoc(doc(db, "plantas", plantaActiva, "puntos_control", id), { nombre });
                 let horariosActualizados = true;
                 try {
                     await actualizarNombreEnRutas(punto.codigo, nombre);
@@ -2912,8 +3285,8 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
             try {
                 const batch = writeBatch(db);
-                rutasAsociadas.forEach(r => batch.delete(doc(db, "rutas_horarias", r.id)));
-                batch.delete(doc(db, "puntos_control", id));
+                rutasAsociadas.forEach(r => batch.delete(doc(db, "plantas", plantaActiva, "rutas_horarias", r.id)));
+                batch.delete(doc(db, "plantas", plantaActiva, "puntos_control", id));
                 await batch.commit();
                 await Promise.all([cargarPuntos(), cargarRutas()]);
                 renderizarPuntosAdmin();
@@ -2931,7 +3304,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             if (!confirm(`¿Eliminar el horario ${r ? r.hora : ''} de ${r ? r.puntoNombre : 'este punto'}?`)) return;
 
             try {
-                await deleteDoc(doc(db, "rutas_horarias", id));
+                await deleteDoc(doc(db, "plantas", plantaActiva, "rutas_horarias", id));
                 await cargarRutas();
                 renderizarRutasAdmin();
                 renderizarPuntosAdmin();
@@ -2948,7 +3321,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             if (!confirm(`¿Eliminar a "${nombre}"? El historial de escaneos se conserva.`)) return;
 
             try {
-                await deleteDoc(doc(db, "operadores", id));
+                await deleteDoc(doc(db, "plantas", plantaActiva, "operadores", id));
                 await cargarOperadores();
                 renderizarPersonalAdmin();
                 mostrarAvisoPanel(`Operador "${nombre}" eliminado.`, 'ok');
@@ -2977,7 +3350,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 } else {
                     const corte = Date.now() - RETENCION_MS;
                     const snap = await getDocs(query(
-                        collection(db, "registros_ronda"),
+                        collection(db, "plantas", plantaActiva, "registros_ronda"),
                         where("timestampMs", ">=", corte),
                         orderBy("timestampMs", "desc"),
                         limit(LIMITE_EXPORTACION)
@@ -3295,10 +3668,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 gate.classList.add('hidden');
                 // Mostrar el login siempre después de pasar el gate.
                 setTimeout(() => {
-                    const modalLogin = document.getElementById('modal-login-encargado');
-                    if (modalLogin) {
-                        modalLogin.classList.remove('hidden');
-                    }
+                    mostrarModalLogin();
                 }, 300);
             } else {
                 // Si no se cumplen los requisitos, informar cuál falta.
@@ -3334,7 +3704,7 @@ document.addEventListener('DOMContentLoaded', () => {
             input.value = obtenerFechaFiltroISO();
             // Limitar el minimo a la fecha mas antigua con registros (si se puede).
             try {
-                const snap = await getDocs(query(collection(db, "registros_ronda"), orderBy("fechaISO", "asc"), limit(1)));
+                const snap = await getDocs(query(collection(db, "plantas", plantaActiva, "registros_ronda"), orderBy("fechaISO", "asc"), limit(1)));
                 if (!snap.empty) {
                     const oldest = snap.docs[0].data().fechaISO;
                     if (oldest) input.min = oldest;

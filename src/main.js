@@ -2538,7 +2538,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 const precision = Math.round(pos.coords.accuracy);
                 if (!confirm(`¿Recalibrar "${p.nombre}" a tu ubicación actual?\nLat: ${lat.toFixed(6)}  Lng: ${lng.toFixed(6)}  (±${precision} m)`)) return;
                 try {
-                    await updateDoc(doc(db, 'puntos_control', id), { lat, lng });
+                    await updateDoc(doc(db, 'plantas', plantaActiva, 'puntos_control', id), { lat, lng });
                     await cargarPuntos();
                     renderizarPuntosAdmin();
                     if (mapaPuntos) actualizarMapaPuntos();

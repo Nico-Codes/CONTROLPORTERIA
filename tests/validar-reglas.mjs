@@ -76,6 +76,7 @@ comprobar('Eliminar punto pide confirmación', contiene('if (!confirm(aviso)) re
 comprobar('Eliminar punto borra sus rutas en lote', contiene('rutasAsociadas.forEach(r => batch.delete(doc(db, "plantas", plantaActiva, "rutas_horarias", r.id)));'));
 comprobar('No se permiten nombres de punto duplicados', contiene('if (existePuntoConNombre(nombre))'));
 comprobar('Editar un punto solo modifica su nombre', contiene('updateDoc(doc(db, "plantas", plantaActiva, "puntos_control", id), { nombre });'));
+comprobar('Recalibrar un punto actualiza la ubicación dentro de la planta activa', contiene("updateDoc(doc(db, 'plantas', plantaActiva, 'puntos_control', id), { lat, lng });"));
 comprobar('Editar el punto conserva su código QR y evita nombres duplicados', contiene('existePuntoConNombre(nombre, punto.codigo)'));
 comprobar('Los horarios asociados reciben el nuevo nombre', contiene('lote.update(ruta.ref, { puntoNombre: nombre })'));
 comprobar('La programación permite elegir puntos desde el mapa', contiene('window.abrirModalMapaRuta'));

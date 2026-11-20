@@ -3298,11 +3298,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const modalLogin = document.getElementById('modal-login-encargado');
                     if (modalLogin) {
                         modalLogin.classList.remove('hidden');
-                        const sheet = document.getElementById('sheet-login-encargado');
-                        if (sheet) {
-                            sheet.classList.remove('scale-95', 'opacity-0');
-                            sheet.classList.add('scale-100', 'opacity-100');
-                        }
                     }
                 }, 300);
             } else {

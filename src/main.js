@@ -132,6 +132,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
 
             // Listener de autenticación de Firebase. Restaura la sesión al cargar
             // la página y reacciona a cambios (login/logout).
+            console.log('[Auth] Registrando onAuthStateChanged listener...');
             onAuthStateChanged(auth, async (user) => {
                 console.log('[Auth] onAuthStateChanged fired, user:', user ? user.uid : 'null');
                 if (user) {

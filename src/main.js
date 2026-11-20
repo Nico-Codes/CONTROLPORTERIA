@@ -2052,85 +2052,100 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             });
         }
 
-        let cesiumViewer = null;
-        let cesiumCargando = false;
+        let mapa3D = null;
+        let mapa3DCargando = false;
 
-        async function cargarCesium() {
-            if (window.Cesium) return window.Cesium;
-            if (cesiumCargando) {
-                while (!window.Cesium) await new Promise(r => setTimeout(r, 100));
-                return window.Cesium;
+        async function cargarMapLibre() {
+            if (window.maplibregl) return window.maplibregl;
+            if (mapa3DCargando) {
+                while (!window.maplibregl) await new Promise(r => setTimeout(r, 100));
+                return window.maplibregl;
             }
-            cesiumCargando = true;
-            const version = '1.118';
-            const base = `https://cesium.com/downloads/cesiumjs/releases/${version}/Build/Cesium/`;
-            window.CESIUM_BASE_URL = base;
+            mapa3DCargando = true;
+            const version = '4.7.1';
+            const base = `https://unpkg.com/maplibre-gl@${version}/dist/`;
             const link = document.createElement('link');
             link.rel = 'stylesheet';
-            link.href = base + 'Widgets/widgets.css';
+            link.href = base + 'maplibre-gl.css';
             document.head.appendChild(link);
             await new Promise((resolve, reject) => {
                 const s = document.createElement('script');
-                s.src = base + 'Cesium.js';
+                s.src = base + 'maplibre-gl.js';
                 s.onload = resolve;
                 s.onerror = reject;
                 document.head.appendChild(s);
             });
-            cesiumCargando = false;
-            return window.Cesium;
+            mapa3DCargando = false;
+            return window.maplibregl;
         }
 
-        window.abrirModalCesium = async () => {
-            const modal = document.getElementById('modal-cesium');
+        window.abrirModal3D = async () => {
+            const modal = document.getElementById('modal-mapa-3d');
             if (!modal) return;
             modal.classList.remove('hidden');
-            let Cesium;
+            let maplibregl;
             try {
-                Cesium = await cargarCesium();
+                maplibregl = await cargarMapLibre();
             } catch (e) {
-                console.error('[Cesium] No se pudo cargar la librería 3D:', e);
+                console.error('[3D] No se pudo cargar MapLibre:', e);
                 mostrarAvisoPanel('No se pudo cargar la vista 3D. Revisá la conexión a Internet.', 'error');
-                cerrarModalCesium();
+                cerrarModal3D();
                 return;
             }
-            if (!cesiumViewer) {
-                Cesium.Ion.defaultAccessToken = '';
-                cesiumViewer = new Cesium.Viewer('cesium-container', {
-                    baseLayer: new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({ url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', credit: '© OpenStreetMap contributors' })),
-                    terrainProvider: new Cesium.EllipsoidTerrainProvider(),
-                    baseLayerPicker: false,
-                    animation: false,
-                    timeline: false,
-                    fullscreenButton: false,
-                    geocoder: false,
-                    homeButton: true,
-                    infoBox: true,
-                    sceneModePicker: true,
-                    selectionIndicator: true,
-                    navigationHelpButton: false,
-                    creditContainer: 'cesium-credits'
+            const container = document.getElementById('mapa-3d-container');
+            if (!mapa3D) {
+                mapa3D = new maplibregl.Map({
+                    container,
+                    style: {
+                        version: 8,
+                        sources: {
+                            'satelite': {
+                                type: 'raster',
+                                tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+                                tileSize: 256,
+                                attribution: 'Tiles © Esri'
+                            },
+                            'terreno': {
+                                type: 'raster-dem',
+                                tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+                                tileSize: 256,
+                                encoding: 'terrarium',
+                                maxzoom: 15
+                            }
+                        },
+                        layers: [{ id: 'satelite', type: 'raster', source: 'satelite' }],
+                        terrain: { source: 'terreno', exaggeration: 1.5 }
+                    },
+                    center: [-61.154, -32.851],
+                    zoom: 12,
+                    pitch: 60,
+                    bearing: 0,
+                    maxPitch: 85
+                });
+                mapa3D.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+                mapa3D.on('load', () => {
+                    const validos = Object.values(puntosCache).filter(coordenadasValidasPunto);
+                    validos.forEach(p => {
+                        const el = document.createElement('div');
+                        el.style.cssText = 'width:18px;height:18px;border-radius:50%;background:#0F172A;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:pointer;';
+                        const popup = new maplibregl.Popup({ offset: 12 }).setHTML(`<strong>${escapeHtml(p.nombre || 'Punto')}</strong><br><span style="font-family:monospace;font-size:11px">${escapeHtml(p.codigo)}</span>`);
+                        new maplibregl.Marker({ element: el })
+                            .setLngLat([Number(p.lng), Number(p.lat)])
+                            .setPopup(popup)
+                            .addTo(mapa3D);
+                    });
+                    if (validos.length > 0) {
+                        const bounds = new maplibregl.LngLatBounds();
+                        validos.forEach(p => bounds.extend([Number(p.lng), Number(p.lat)]));
+                        mapa3D.fitBounds(bounds, { padding: 60, maxZoom: 17, pitch: 60 });
+                    }
                 });
             }
-            cesiumViewer.entities.removeAll();
-            const validos = Object.values(puntosCache).filter(coordenadasValidasPunto);
-            validos.forEach(p => {
-                cesiumViewer.entities.add({
-                    name: p.nombre || 'Punto de control',
-                    position: Cesium.Cartesian3.fromDegrees(Number(p.lng), Number(p.lat)),
-                    point: { pixelSize: 14, color: Cesium.Color.fromCssColorString('#0F172A'), outlineColor: Cesium.Color.WHITE, outlineWidth: 2 },
-                    label: { text: p.nombre || 'Punto', font: '12px sans-serif', fillColor: Cesium.Color.BLACK, style: Cesium.LabelStyle.FILL_AND_OUTLINE, outlineWidth: 2, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -16) }
-                });
-            });
-            if (validos.length > 0) {
-                cesiumViewer.flyTo(cesiumViewer.entities, { duration: 1.5 });
-            } else {
-                cesiumViewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(-61.154, -32.851, 1500000) });
-            }
-            requestAnimationFrame(() => { if (cesiumViewer) cesiumViewer.resize(); });
+            requestAnimationFrame(() => { if (mapa3D) mapa3D.resize(); });
         };
 
-        window.cerrarModalCesium = () => {
-            const modal = document.getElementById('modal-cesium');
+        window.cerrarModal3D = () => {
+            const modal = document.getElementById('modal-mapa-3d');
             if (modal) modal.classList.add('hidden');
         };
 

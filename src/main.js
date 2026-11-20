@@ -2106,8 +2106,8 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
             if (watchUbicacion) {
                 navigator.geolocation.clearWatch(watchUbicacion);
                 watchUbicacion = null;
-                if (marcadorMiUbicacion && capaPuntos) {
-                    capaPuntos.removeLayer(marcadorMiUbicacion);
+                if (marcadorMiUbicacion && mapaPuntos) {
+                    mapaPuntos.removeLayer(marcadorMiUbicacion);
                     marcadorMiUbicacion = null;
                 }
                 if (btn) btn.classList.remove('bg-[#0F172A]', 'text-white');
@@ -2119,6 +2119,7 @@ import { registroCorrespondeARuta, rutaCompletada, evaluarEstadoRuta, obtenerMar
                 return;
             }
             watchUbicacion = navigator.geolocation.watchPosition((pos) => {
+                if (!watchUbicacion) return;
                 const lat = pos.coords.latitude;
                 const lng = pos.coords.longitude;
                 if (!marcadorMiUbicacion) {
